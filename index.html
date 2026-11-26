@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>CINEMA-LAB AI v5.0 // Fast Mobile Studio</title>
+<title>CINEMA-LAB AI v5.1 // HD Audio DSP & GPU Studio</title>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
 <style>
 :root{--bg:#050608;--panel:#0e1117;--gold:#f59e0b;--cyan:#06b6d4;--red:#ef4444;--green:#10b981;--purple:#a855f7;--txt:#f8fafc;--mut:#94a3b8;--bd:#1e293b}
@@ -52,8 +52,8 @@ input[type=range]{width:100%;accent-color:var(--gold)}
 <body>
 
 <header>
-  <div><div class="brand">🎬 CINEMA-LAB AI v5.0</div><div class="sub">⚡ MOBILE HARDWARE ENGINE</div></div>
-  <div class="badge" id="fpsBadge">SD+ • 30FPS</div>
+  <div><div class="brand">🎬 CINEMA-LAB AI v5.1</div><div class="sub">🎙️ 128KBPS HD AUDIO & GPU STUDIO</div></div>
+  <div class="badge" id="fpsBadge">360P • 30FPS</div>
 </header>
 
 <div class="wrap">
@@ -97,16 +97,20 @@ input[type=range]{width:100%;accent-color:var(--gold)}
     </div>
   </div>
 
-  <!-- LIVE VOICE EFFECTS STUDIO -->
+  <!-- STUDIO VOICE DSP RACK -->
   <div class="card">
-    <div class="ctitle"><span>🎙️ লাইভ ভয়েস ইফেক্ট (রেকর্ডিং অডিও)</span><span id="voiceTag" style="color:var(--purple)">NORMAL VOICE</span></div>
+    <div class="ctitle"><span>🎙️ স্টুডিও ভয়েস ইফেক্ট (HD অডিও DSP)</span><span id="voiceTag" style="color:var(--purple)">STUDIO CLEAR</span></div>
     <div class="vgrid">
-      <button class="lbtn vbtn active" id="v-normal" onclick="setVoiceFX('normal','NORMAL VOICE')">🎤 আসল কণ্ঠ</button>
-      <button class="lbtn vbtn" id="v-radio" onclick="setVoiceFX('radio','RADIO PODCAST')">📻 রেডিও / নিউজ</button>
-      <button class="lbtn vbtn" id="v-boss" onclick="setVoiceFX('boss','DEEP BOSS')">🦍 ডিপ বস</button>
-      <button class="lbtn vbtn" id="v-robot" onclick="setVoiceFX('robot','CYBORG COMMS')">🤖 রোবট / ওয়াকি</button>
-      <button class="lbtn vbtn" id="v-echo" onclick="setVoiceFX('echo','STUDIO ECHO')">🏛️ স্টুডিও ইকো</button>
-      <button class="lbtn vbtn" id="v-monitor" onclick="toggleMicMonitor()">🎧 হেডফোন টেস্ট</button>
+      <button class="lbtn vbtn active" id="v-normal" onclick="setVoiceFX('normal','STUDIO CLEAR')">🎤 ক্লিয়ার ভয়েস</button>
+      <button class="lbtn vbtn" id="v-radio" onclick="setVoiceFX('radio','BROADCAST NEWS')">📻 নিউজ / রেডিও</button>
+      <button class="lbtn vbtn" id="v-boss" onclick="setVoiceFX('boss','DEEP CINEMA')">🦍 গম্ভীর ভয়েস</button>
+      <button class="lbtn vbtn" id="v-echo" onclick="setVoiceFX('echo','CONCERT REVERB')">🏛️ গান / ইকো</button>
+      <button class="lbtn vbtn" id="v-walkie" onclick="setVoiceFX('walkie','WALKIE RADIO')">📡 ওয়াকি-টকি</button>
+      <button class="lbtn vbtn" id="v-monitor" onclick="toggleMicMonitor()">🎧 লাইভ শুনুন</button>
+    </div>
+    <div class="srow" style="margin-top:8px;margin-bottom:0">
+      <div><span>Mic Gain (মাইক ভলিউম বুস্ট):</span><span id="micGainLbl" style="color:var(--purple)">120%</span></div>
+      <input type="range" id="micGainSlider" min="60" max="220" value="120" oninput="updateMicGain(this.value)">
     </div>
   </div>
 
@@ -177,7 +181,6 @@ let stream=null,track=null,facing='environment',torchOn=false,camActive=false,sw
 let activeLUT='raw',cineBars=false,mirrorCam=false,blurMode=false;
 let recorder=null,chunks=[],recordedBytes=0,isRec=false,recStart=0,frameCount=0,lastVideoBlob=null,lastVideoName='';
 
-// Proven mobile-safe canvas resolutions (360p default guarantees instant zero-lag recording)
 const resOptions=[
   {label:'360p Fast',long:640,short:360},
   {label:'480p SD',long:854,short:480},
@@ -312,59 +315,107 @@ function toggleBars(){
   document.getElementById('barBtn').classList.toggle('on',cineBars);
 }
 
-// --- ON-DEMAND VOICE DSP ENGINE (ONLY RUNS WHEN EFFECT SELECTED) ---
-let actx=null,audioDest=null,micSrc=null,voiceFX='normal',monitorOn=false,activeNodes=[];
+// --- PARALLEL NON-CHOPPY STUDIO AUDIO DSP RACK ---
+let actx=null,audioDest=null,micSrc=null,inGain=null,monitorGain=null;
+let busGains={},voiceFX='normal',monitorOn=false;
 
-function buildAudioGraph(){
+function makeDistortionCurve(amount){
+  const n=44100,curve=new Float32Array(n);
+  for(let i=0;i<n;i++){
+    const x=i*2/n-1;
+    curve[i]=((3+amount)*x*20*(Math.PI/180))/(Math.PI+amount*Math.abs(x));
+  }
+  return curve;
+}
+
+function initStudioAudioDSP(){
   if(!stream||stream.getAudioTracks().length===0)return;
-  if(voiceFX==='normal'&&!monitorOn)return; // Do NOT lock mic stream when using normal voice!
   try{
-    if(!actx)actx=new(window.AudioContext||window.webkitAudioContext)();
+    if(!actx)actx=new(window.AudioContext||window.webkitAudioContext)({sampleRate:48000});
     if(actx.state==='suspended')actx.resume();
     if(!audioDest)audioDest=actx.createMediaStreamDestination();
 
-    activeNodes.forEach(n=>{try{n.disconnect();}catch(e){}});
-    activeNodes=[];
-
+    if(micSrc){try{micSrc.disconnect();}catch(e){}}
     micSrc=actx.createMediaStreamSource(stream);
-    activeNodes.push(micSrc);
-    let tail=micSrc;
 
-    if(voiceFX==='radio'){
-      const hp=actx.createBiquadFilter();hp.type='highpass';hp.frequency.value=110;
-      const bass=actx.createBiquadFilter();bass.type='lowshelf';bass.frequency.value=220;bass.gain.value=9;
-      const comp=actx.createDynamicsCompressor();comp.threshold.value=-24;comp.ratio.value=6;
-      micSrc.connect(hp);hp.connect(bass);bass.connect(comp);
-      activeNodes.push(hp,bass,comp);
-      tail=comp;
-    }else if(voiceFX==='boss'){
-      const low=actx.createBiquadFilter();low.type='lowpass';low.frequency.value=680;
-      const bass=actx.createBiquadFilter();bass.type='lowshelf';bass.frequency.value=180;bass.gain.value=14;
-      micSrc.connect(low);low.connect(bass);
-      activeNodes.push(low,bass);
-      tail=bass;
-    }else if(voiceFX==='robot'){
-      const bp=actx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=1100;bp.Q.value=2.5;
-      const osc=actx.createOscillator();osc.type='sawtooth';osc.frequency.value=48;
-      const modGain=actx.createGain();modGain.gain.value=0.6;
-      osc.connect(modGain.gain);osc.start();
-      micSrc.connect(bp);bp.connect(modGain);
-      activeNodes.push(bp,osc,modGain);
-      tail=modGain;
-    }else if(voiceFX==='echo'){
-      const delay=actx.createDelay();delay.delayTime.value=0.24;
-      const fb=actx.createGain();fb.gain.value=0.38;
-      delay.connect(fb);fb.connect(delay);
-      micSrc.connect(delay);
-      delay.connect(audioDest);
-      if(monitorOn)delay.connect(actx.destination);
-      activeNodes.push(delay,fb);
-      tail=micSrc;
-    }
+    // Master Input & Limiter Compressor (eliminates clipping & stutter)
+    inGain=actx.createGain();
+    inGain.gain.value=parseInt(document.getElementById('micGainSlider').value)/100;
 
-    tail.connect(audioDest);
-    if(monitorOn)tail.connect(actx.destination);
+    const hpFilter=actx.createBiquadFilter();
+    hpFilter.type='highpass';hpFilter.frequency.value=85;
+
+    const masterComp=actx.createDynamicsCompressor();
+    masterComp.threshold.value=-20;
+    masterComp.knee.value=18;
+    masterComp.ratio.value=4;
+    masterComp.attack.value=0.005;
+    masterComp.release.value=0.15;
+
+    micSrc.connect(hpFilter);
+    hpFilter.connect(inGain);
+
+    // 1. STUDIO CLEAR BUS
+    const gNormal=actx.createGain();
+    const clarityEQ=actx.createBiquadFilter();
+    clarityEQ.type='peaking';clarityEQ.frequency.value=3200;clarityEQ.Q.value=1.2;clarityEQ.gain.value=4;
+    inGain.connect(clarityEQ);clarityEQ.connect(gNormal);gNormal.connect(masterComp);
+
+    // 2. BROADCAST NEWS / RADIO BUS
+    const gRadio=actx.createGain();
+    const radBass=actx.createBiquadFilter();radBass.type='lowshelf';radBass.frequency.value=180;radBass.gain.value=10;
+    const radCrisp=actx.createBiquadFilter();radCrisp.type='peaking';radCrisp.frequency.value=3800;radCrisp.gain.value=7;
+    inGain.connect(radBass);radBass.connect(radCrisp);radCrisp.connect(gRadio);gRadio.connect(masterComp);
+
+    // 3. DEEP CINEMA VOICE BUS
+    const gBoss=actx.createGain();
+    const deepSub=actx.createBiquadFilter();deepSub.type='lowshelf';deepSub.frequency.value=160;deepSub.gain.value=15;
+    const deepMid=actx.createBiquadFilter();deepMid.type='peaking';deepMid.frequency.value=420;deepMid.gain.value=6;
+    const deepHigh=actx.createBiquadFilter();deepHigh.type='highshelf';deepHigh.frequency.value=2600;deepHigh.gain.value=-5;
+    inGain.connect(deepSub);deepSub.connect(deepMid);deepMid.connect(deepHigh);deepHigh.connect(gBoss);gBoss.connect(masterComp);
+
+    // 4. CONCERT ECHO / SINGING REVERB BUS (Dry + Smooth Damped Delay)
+    const gEcho=actx.createGain();
+    const delay=actx.createDelay();delay.delayTime.value=0.22;
+    const echoTone=actx.createBiquadFilter();echoTone.type='lowpass';echoTone.frequency.value=2400;
+    const fb=actx.createGain();fb.gain.value=0.42;
+    const wetMix=actx.createGain();wetMix.gain.value=0.65;
+    inGain.connect(gEcho); // Clean dry vocal
+    inGain.connect(delay);delay.connect(echoTone);echoTone.connect(fb);fb.connect(delay);
+    echoTone.connect(wetMix);wetMix.connect(gEcho);
+    gEcho.connect(masterComp);
+
+    // 5. WALKIE-TALKIE COMMS BUS (Clear Bandpass + Warm Saturation, Zero Chopping)
+    const gWalkie=actx.createGain();
+    const wBand=actx.createBiquadFilter();wBand.type='bandpass';wBand.frequency.value=1450;wBand.Q.value=1.4;
+    const wDrive=actx.createWaveShaper();wDrive.curve=makeDistortionCurve(25);
+    const wOut=actx.createGain();wOut.gain.value=1.35;
+    inGain.connect(wBand);wBand.connect(wDrive);wDrive.connect(wOut);wOut.connect(gWalkie);gWalkie.connect(masterComp);
+
+    busGains={normal:gNormal,radio:gRadio,boss:gBoss,echo:gEcho,walkie:gWalkie};
+
+    // Route Master Compressor to Recording Stream & Optional Live Monitor
+    masterComp.connect(audioDest);
+    monitorGain=actx.createGain();
+    monitorGain.gain.value=monitorOn?0.85:0;
+    masterComp.connect(monitorGain);
+    monitorGain.connect(actx.destination);
+
+    applyActiveBus();
   }catch(e){}
+}
+
+function applyActiveBus(){
+  if(!actx||!busGains.normal)return;
+  const now=actx.currentTime;
+  Object.keys(busGains).forEach(k=>{
+    busGains[k].gain.setTargetAtTime(k===voiceFX?1:0,now,0.03);
+  });
+}
+
+function updateMicGain(val){
+  document.getElementById('micGainLbl').innerText=val+'%';
+  if(inGain&&actx)inGain.gain.setTargetAtTime(val/100,actx.currentTime,0.03);
 }
 
 function setVoiceFX(fx,label){
@@ -372,13 +423,15 @@ function setVoiceFX(fx,label){
   document.querySelectorAll('.vbtn').forEach(b=>{if(b.id!=='v-monitor')b.classList.remove('active');});
   document.getElementById('v-'+fx).classList.add('active');
   document.getElementById('voiceTag').innerText=label;
-  if(camActive)buildAudioGraph();
+  if(actx&&actx.state==='suspended')actx.resume();
+  applyActiveBus();
 }
 
 function toggleMicMonitor(){
   monitorOn=!monitorOn;
   document.getElementById('v-monitor').classList.toggle('active',monitorOn);
-  if(camActive)buildAudioGraph();
+  if(actx&&actx.state==='suspended')actx.resume();
+  if(monitorGain&&actx)monitorGain.gain.setTargetAtTime(monitorOn?0.85:0,actx.currentTime,0.03);
 }
 
 // --- CAMERA HARDWARE ---
@@ -388,8 +441,16 @@ async function openCamera(){
     throw new Error('এই ব্রাউজারে ক্যামেরা সাপোর্ট নেই।');
   }
 
+  const audioConstraints={
+    echoCancellation:true,
+    noiseSuppression:true,
+    autoGainControl:true,
+    sampleRate:48000,
+    channelCount:1
+  };
+
   const attempts=[
-    {video:{facingMode:facing,width:{ideal:1280},height:{ideal:720}},audio:true},
+    {video:{facingMode:facing,width:{ideal:1280},height:{ideal:720}},audio:audioConstraints},
     {video:{facingMode:facing},audio:true},
     {video:true,audio:true},
     {video:true,audio:false}
@@ -409,7 +470,7 @@ async function openCamera(){
   vid.srcObject=stream;
   await vid.play();
   track=stream.getVideoTracks()[0];
-  buildAudioGraph();
+  initStudioAudioDSP();
   updateCanvasDimensions();
 }
 
@@ -428,7 +489,7 @@ async function toggleCam(){
     b.innerText='⏹️ ক্যামেরা বন্ধ';b.classList.add('on');
     requestAnimationFrame(renderCinema);
   }catch(e){
-    alert('ক্যামেরা চালু হয়নি: Chrome Permissions থেকে Camera Allow করুন।');
+    alert('ক্যামেরা চালু হয়নি: Chrome Permissions থেকে Camera ও Microphone Allow করুন।');
   }
 }
 
@@ -628,7 +689,7 @@ function renderCinema(){
   requestAnimationFrame(renderCinema);
 }
 
-// --- EXACT v3.0 PROVEN SAVE & RECORDING ENGINE ---
+// --- 128KBPS HD AUDIO + VIDEO RECORDING ---
 function captureStill(){
   if(!camActive){alert('আগে ক্যামেরা চালু করুন।');return;}
   const url=cvs.toDataURL('image/png');
@@ -660,12 +721,14 @@ function toggleRecord(){
     return;
   }
 
+  if(actx&&actx.state==='suspended')actx.resume();
   document.getElementById('dlArea').style.display='none';
+
   const fps=fpsOptions[fpsIdx];
   const cStream=cvs.captureStream(fps);
 
-  // Attach audio cleanly (only use audioDest if voice FX is turned ON)
-  if(voiceFX!=='normal'&&audioDest&&audioDest.stream.getAudioTracks().length>0){
+  // Route through Studio DSP Rack so all 5 voice modes & HD clarity work seamlessly
+  if(audioDest&&audioDest.stream.getAudioTracks().length>0){
     audioDest.stream.getAudioTracks().forEach(t=>cStream.addTrack(t));
   }else if(stream){
     stream.getAudioTracks().forEach(t=>cStream.addTrack(t));
@@ -676,13 +739,16 @@ function toggleRecord(){
   const types=['video/webm;codecs=vp8,opus','video/webm','video/mp4',''];
   let opt={};
   for(const t of types){
-    if(!t||MediaRecorder.isTypeSupported(t)){opt=t?{mimeType:t}:{};break;}
+    if(!t||MediaRecorder.isTypeSupported(t)){
+      opt=t?{mimeType:t,audioBitsPerSecond:128000}:{audioBitsPerSecond:128000};
+      break;
+    }
   }
 
   try{
     recorder=new MediaRecorder(cStream,opt);
   }catch(e){
-    recorder=new MediaRecorder(cvs.captureStream(fps));
+    recorder=new MediaRecorder(cStream);
   }
 
   recorder.ondataavailable=e=>{
@@ -694,7 +760,7 @@ function toggleRecord(){
 
   recorder.onstop=()=>{
     if(chunks.length===0){
-      alert('ভিডিও রেকর্ড হয়নি। কোয়ালিটি 360p রেখে অন্তত ৩ সেকেন্ড রেকর্ড করুন।');
+      alert('ভিডিও রেকর্ড হয়নি। অন্তত ৩ সেকেন্ড রেকর্ড করুন।');
       return;
     }
     const mime=recorder.mimeType||'video/webm';
@@ -715,7 +781,7 @@ function toggleRecord(){
     </div>`;
   };
 
-  recorder.start(500);
+  recorder.start(1000);
   isRec=true;
   recStart=Date.now();
   btn.innerText='⏹️ রেকর্ডিং সেভ';
