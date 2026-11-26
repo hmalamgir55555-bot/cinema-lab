@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>CINEMA-LAB AI v4.2 // Zero-Latency GPU Studio</title>
+<title>CINEMA-LAB AI v4.3 // Stable Anti-Flicker Studio</title>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
 <style>
 :root{--bg:#050608;--panel:#0e1117;--gold:#f59e0b;--cyan:#06b6d4;--red:#ef4444;--green:#10b981;--purple:#a855f7;--txt:#f8fafc;--mut:#94a3b8;--bd:#1e293b}
@@ -52,7 +52,7 @@ input[type=range]{width:100%;accent-color:var(--gold)}
 <body>
 
 <header>
-  <div><div class="brand">🎬 CINEMA-LAB AI v4.2</div><div class="sub">⚡ ZERO-LATENCY GPU ENGINE</div></div>
+  <div><div class="brand">🎬 CINEMA-LAB AI v4.3</div><div class="sub">⚡ STABLE V-SYNC GPU ENGINE</div></div>
   <div class="badge" id="fpsBadge">1080P • 30FPS</div>
 </header>
 
@@ -195,7 +195,8 @@ const ratios=[
 let rIdx=0;
 
 const vid=document.getElementById('vid');
-const cvs=document.getElementById('cineCvs'),ctx=cvs.getContext('2d',{desynchronized:true,alpha:false});
+// Standard V-Sync double-buffered context (eliminates screen flickering)
+const cvs=document.getElementById('cineCvs'),ctx=cvs.getContext('2d',{alpha:false});
 
 const vfxCvs=document.createElement('canvas'),vfxCtx=vfxCvs.getContext('2d',{willReadFrequently:true});
 const bgCvs=document.createElement('canvas'),bgCtx=bgCvs.getContext('2d');
@@ -207,9 +208,9 @@ if(typeof SelfieSegmentation!=='undefined'){
   selfieSeg=new SelfieSegmentation({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${f}`});
   selfieSeg.setOptions({modelSelection:1,selfieMode:false});
   selfieSeg.onResults(res=>{
-    maskCvs.width=320;maskCvs.height=180;
-    maskCtx.clearRect(0,0,maskCvs.width,maskCvs.height);
-    maskCtx.drawImage(res.segmentationMask,0,0,maskCvs.width,maskCvs.height);
+    if(maskCvs.width!==320||maskCvs.height!==180){maskCvs.width=320;maskCvs.height=180;}
+    maskCtx.clearRect(0,0,320,180);
+    maskCtx.drawImage(res.segmentationMask,0,0,320,180);
     segReady=true;segBusy=false;
   });
 }
@@ -228,6 +229,16 @@ setInterval(()=>{
   }
 },1000/30);
 
+function syncBufferSizes(w,h){
+  if(cvs.width!==w||cvs.height!==h){cvs.width=w;cvs.height=h;}
+  const bw=Math.round(w*0.4),bh=Math.round(h*0.4);
+  if(bgCvs.width!==bw||bgCvs.height!==bh){bgCvs.width=bw;bgCvs.height=bh;}
+  const fw=Math.round(w*0.6),fh=Math.round(h*0.6);
+  if(fgCvs.width!==fw||fgCvs.height!==fh){fgCvs.width=fw;fgCvs.height=fh;}
+  const vw=480,vh=Math.round(480*(h/w));
+  if(vfxCvs.width!==vw||vfxCvs.height!==vh){vfxCvs.width=vw;vfxCvs.height=vh;}
+}
+
 function updateCanvasDimensions(){
   const res=resOptions[resIdx];
   const r=ratios[rIdx];
@@ -235,7 +246,7 @@ function updateCanvasDimensions(){
   if(r.name==='9:16'){w=res.short;h=res.long;}
   else if(r.name==='4:5'){w=res.short;h=Math.round(res.short*1.25);}
   else if(r.name==='1:1'){w=res.short;h=res.short;}
-  cvs.width=w;cvs.height=h;
+  syncBufferSizes(w,h);
   document.getElementById('vfBox').style.aspectRatio=r.css;
   document.getElementById('fpsBadge').innerText=`${res.label.split(' ')[0]} • ${fpsOptions[fpsIdx]}FPS`;
   document.getElementById('camHud').innerText=`CAM: ${facing==='environment'?'BACK':'FRONT'} • ${w}x${h} • ${fpsOptions[fpsIdx]}FPS`;
@@ -366,11 +377,11 @@ function toggleMicMonitor(){
   if(camActive)buildAudioGraph();
 }
 
-// --- CAMERA HARDWARE (UNIVERSAL FALLBACK) ---
+// --- CAMERA HARDWARE ---
 async function openCamera(){
   if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;track=null;torchOn=false;document.getElementById('torchBtn').classList.remove('on');}
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
-    throw new Error('এই ব্রাউজারে ক্যামেরা সাপোর্ট নেই। Chrome ব্যবহার করুন।');
+    throw new Error('এই ব্রাউজারে ক্যামেরা সাপোর্ট নেই।');
   }
   const res=resOptions[resIdx];
   const fps=fpsOptions[fpsIdx];
@@ -420,7 +431,7 @@ async function toggleCam(){
     b.innerText='⏹️ ক্যামেরা বন্ধ';b.classList.add('on');
     requestAnimationFrame(renderCinema);
   }catch(e){
-    alert('ক্যামেরা চালু হয়নি ('+(e.name||'Error')+'): ফোনের Settings > Apps > Chrome > Permissions থেকে Camera ও Microphone Allow করুন।');
+    alert('ক্যামেরা চালু হয়নি ('+(e.name||'Error')+'): Chrome Permissions থেকে Camera Allow করুন।');
   }
 }
 
@@ -497,9 +508,10 @@ function renderCinema(){
       }
     }
 
+    ctx.filter='none';
+
     if(isCPUMode){
-      const pW=480,pH=Math.round(480*(H/W));
-      vfxCvs.width=pW;vfxCvs.height=pH;
+      const pW=vfxCvs.width,pH=vfxCvs.height;
       drawSourceCover(vfxCtx,vid,pW,pH,mirrorCam);
       const img=vfxCtx.getImageData(0,0,pW,pH),d=img.data;
 
@@ -557,14 +569,12 @@ function renderCinema(){
 
       if(blurMode&&segReady){
         const blurPx=document.getElementById('blurVal').value;
-        bgCvs.width=Math.round(W*0.4);bgCvs.height=Math.round(H*0.4);
         bgCtx.save();
         bgCtx.filter=`${gpuFilter} blur(${Math.max(2,Math.round(blurPx*0.5))}px)`;
         drawSourceCover(bgCtx,vid,bgCvs.width,bgCvs.height,mirrorCam);
         bgCtx.restore();
         ctx.drawImage(bgCvs,0,0,W,H);
 
-        fgCvs.width=Math.round(W*0.6);fgCvs.height=Math.round(H*0.6);
         fgCtx.save();
         fgCtx.clearRect(0,0,fgCvs.width,fgCvs.height);
         fgCtx.filter='blur(4px)';
