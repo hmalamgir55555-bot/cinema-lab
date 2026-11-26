@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>CINEMA-LAB AI // Live LUT & Film Studio</title>
+<style>
+:root{--bg:#050608;--panel:#0e1117;--gold:#f59e0b;--cyan:#06b6d4;--red:#ef4444;--txt:#f8fafc;--mut:#94a3b8;--bd:#1e293b}
+*{box-sizing:border-box;font-family:'Segoe UI',Tahoma,sans-serif}
+body{margin:0;background:var(--bg);color:var(--txt);padding-bottom:40px}
+header{background:var(--panel);padding:10px 14px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:50}
+.brand{font-size:.95rem;font-weight:800;color:var(--gold);letter-spacing:.8px}
+.sub{font-size:.63rem;color:var(--mut);font-family:monospace}
+.badge{font-size:.68rem;padding:4px 8px;border-radius:4px;border:1px solid var(--gold);color:var(--gold);background:rgba(245,158,11,.12);font-family:monospace;font-weight:bold}
+.wrap{max-width:540px;margin:0 auto;padding:10px}
+.viewfinder{position:relative;width:100%;aspect-ratio:16/9;background:#000;border:2px solid var(--bd);border-radius:8px;overflow:hidden;margin-bottom:10px;box-shadow:0 0 28px rgba(245,158,11,.14)}
+canvas#cineCvs{width:100%;height:100%;display:block}
+.hud{position:absolute;inset:0;pointer-events:none;padding:8px 10px;display:flex;flex-direction:column;justify-content:space-between;font-family:monospace;font-size:.66rem;color:rgba(255,255,255,.85);text-shadow:0 1px 4px #000}
+.hud-row{display:flex;justify-content:space-between;align-items:center}
+.rec-dot{color:var(--red);font-weight:bold}
+.card{background:var(--panel);border:1px solid var(--bd);border-radius:8px;padding:11px;margin-bottom:10px}
+.ctitle{font-size:.73rem;color:var(--gold);font-weight:bold;margin-bottom:8px;letter-spacing:.5px;display:flex;justify-content:space-between}
+.row{display:flex;gap:7px;margin-bottom:8px}
+.btn{flex:1;padding:9px 5px;border-radius:6px;font-size:.73rem;font-weight:bold;cursor:pointer;border:1px solid var(--gold);background:rgba(245,158,11,.12);color:var(--gold);transition:.15s;text-align:center;user-select:none}
+.btn:active{transform:scale(.97)}
+.btn.on{background:var(--gold);color:#000}
+.btn-r{border-color:var(--red);background:rgba(239,68,68,.15);color:var(--red)}
+.btn-r.on{background:var(--red);color:#fff;animation:pulse 1.2s infinite}
+.btn-c{border-color:var(--cyan);background:rgba(6,182,212,.14);color:var(--cyan)}
+.btn-c.on{background:var(--cyan);color:#000}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.luts{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+.lbtn{padding:9px 4px;border-radius:6px;font-size:.69rem;font-weight:bold;cursor:pointer;border:1px solid var(--bd);background:#07090d;color:var(--mut);text-align:center}
+.lbtn.active{border-color:var(--gold);background:rgba(245,158,11,.22);color:#fff;box-shadow:0 0 10px rgba(245,158,11,.25)}
+.srow{margin:8px 0;font-size:.72rem;color:var(--mut)}
+.srow div{display:flex;justify-content:space-between;margin-bottom:3px}
+input[type=range]{width:100%;accent-color:var(--gold)}
+</style>
+</head>
+<body>
+
+<header>
+  <div><div class="brand">🎬 CINEMA-LAB AI v1.0</div><div class="sub">REAL-TIME LUT & 35MM FILM ENGINE</div></div>
+  <div class="badge" id="fpsBadge">24 FPS • RAW</div>
+</header>
+
+<div class="wrap">
+  <div class="viewfinder">
+    <canvas id="cineCvs" width="640" height="360"></canvas>
+    <div class="hud">
+      <div class="hud-row">
+        <span id="recHud">● STANDBY</span>
+        <span id="lutHud">LUT: TEAL & ORANGE</span>
+      </div>
+      <div class="hud-row">
+        <span id="camHud">CAM: BACK • 1080P</span>
+        <span id="tcHud">00:00:00:00</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CAMERA & RECORDING CONTROLS -->
+  <div class="card">
+    <div class="row">
+      <button class="btn" id="camBtn" onclick="toggleCam()">🎥 ক্যামেরা চালু</button>
+      <button class="btn btn-r" id="recBtn" onclick="toggleRecord()">🔴 REC সিনেমা</button>
+      <button class="btn btn-c" onclick="captureStill()">📸 স্টিল ফ্রেম</button>
+    </div>
+    <div class="row" style="margin-bottom:0">
+      <button class="btn" onclick="flipCam()">🔄 ক্যামেরা বদল</button>
+      <button class="btn" id="torchBtn" onclick="toggleTorch()">🔦 টর্চ</button>
+      <button class="btn btn-c on" id="barBtn" onclick="toggleBars()">⬛ 2.39:1 বার</button>
+      <button class="btn" id="gridBtn" onclick="toggleGrid()"># গ্রিড</button>
+    </div>
+    <div id="dlArea" style="display:none;margin-top:8px"></div>
+  </div>
+
+  <!-- HOLLYWOOD LUT PRESETS -->
+  <div class="card">
+    <div class="ctitle"><span>🎨 সিনেমাটিক কালার গ্রেডিং (LIVE LUTs)</span><span>32-BIT COLOR</span></div>
+    <div class="luts">
+      <button class="lbtn active" id="l-teal" onclick="setLUT('teal','TEAL & ORANGE')">🎬 TEAL & ORANGE</button>
+      <button class="lbtn" id="l-noir" onclick="setLUT('noir','NOIR THRILLER')">🌑 NOIR DARK</button>
+      <button class="lbtn" id="l-vintage" onclick="setLUT('vintage','35MM VINTAGE')">🎞️ 35MM FILM</button>
+      <button class="lbtn" id="l-golden" onclick="setLUT('golden','GOLDEN HOUR')">🌅 GOLDEN HOUR</button>
+      <button class="lbtn" id="l-cyber" onclick="setLUT('cyber','CYBER SCI-FI')">☣️ CYBER SCI-FI</button>
+      <button class="lbtn" id="l-raw" onclick="setLUT('raw','NATURAL RAW')">📹 NATURAL RAW</button>
+    </div>
+  </div>
+
+  <!-- OPTICS & FILM GRAIN TUNING -->
+  <div class="card">
+    <div class="ctitle"><span>🎞️ লেন্স ও ফিল্ম-গ্রেইন কন্ট্রোল</span><span>OPTICS</span></div>
+    <div class="srow">
+      <div><span>35mm Film Grain (ফিল্ম দানা):</span><span id="grainLbl" style="color:var(--gold)">18%</span></div>
+      <input type="range" id="grain" min="0" max="60" value="18" oninput="document.getElementById('grainLbl').innerText=this.value+'%'">
+    </div>
+    <div class="srow">
+      <div><span>Cinema Vignette (ফ্রেম ছায়া):</span><span id="vigLbl" style="color:var(--gold)">45%</span></div>
+      <input type="range" id="vig" min="0" max="90" value="45" oninput="document.getElementById('vigLbl').innerText=this.value+'%'">
+    </div>
+    <div class="srow">
+      <div><span>Contrast & Depth (কনট্রাস্ট):</span><span id="conLbl" style="color:var(--gold)">115%</span></div>
+      <input type="range" id="con" min="80" max="160" value="115" oninput="document.getElementById('conLbl').innerText=this.value+'%'">
+    </div>
+    <div class="srow">
+      <div><span>Exposure (আলো নিয়ন্ত্রণ):</span><span id="expLbl" style="color:var(--gold)">100%</span></div>
+      <input type="range" id="exp" min="60" max="150" value="100" oninput="document.getElementById('expLbl').innerText=this.value+'%'">
+    </div>
+  </div>
+</div>
+
+<video id="vid" autoplay playsinline muted style="display:none"></video>
+
+<script>
+let stream=null,track=null,facing='environment',torchOn=false;
+let activeLUT='teal',cineBars=true,showGrid=false;
+let recorder=null,chunks=[],isRec=false,recStart=0,frameCount=0;
+
+const vid=document.getElementById('vid'),cvs=document.getElementById('cineCvs'),ctx=cvs.getContext('2d',{willReadFrequently:true});
+
+setInterval(()=>{
+  frameCount=(frameCount+1)%24;
+  const fStr=String(frameCount).padStart(2,'0');
+  if(isRec){
+    const sec=Math.floor((Date.now()-recStart)/1000);
+    const m=String(Math.floor(sec/60)).padStart(2,'0');
+    const s=String(sec%60).padStart(2,'0');
+    document.getElementById('tcHud').innerText=`00:${m}:${s}:${fStr}`;
+  }else{
+    document.getElementById('tcHud').innerText=new Date().toTimeString().split(' ')[0]+':'+fStr;
+  }
+},42);
+
+function setLUT(id,label){
+  activeLUT=id;
+  document.querySelectorAll('.lbtn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('l-'+id).classList.add('active');
+  document.getElementById('lutHud').innerText='LUT: '+label;
+  document.getElementById('fpsBadge').innerText='24 FPS • '+id.toUpperCase();
+}
+
+function toggleBars(){
+  cineBars=!cineBars;
+  document.getElementById('barBtn').classList.toggle('on',cineBars);
+}
+
+function toggleGrid(){
+  showGrid=!showGrid;
+  document.getElementById('gridBtn').classList.toggle('on',showGrid);
+}
+
+async function startStream(){
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;track=null;torchOn=false;document.getElementById('torchBtn').classList.remove('on');}
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{exact:facing},width:{ideal:1280},height:{ideal:720}},audio:true});
+  }catch(e){
+    const devs=await navigator.mediaDevices.enumerateDevices();
+    const cams=devs.filter(d=>d.kind==='videoinput');
+    const tgt=facing==='environment'?cams[cams.length-1]:cams[0];
+    stream=await navigator.mediaDevices.getUserMedia({video:tgt?{deviceId:{exact:tgt.deviceId}}:{facingMode:facing},audio:true});
+  }
+  vid.srcObject=stream;await vid.play();
+  track=stream.getVideoTracks()[0];
+  document.getElementById('camHud').innerText='CAM: '+(facing==='environment'?'BACK':'FRONT')+' • CINE';
+}
+
+async function toggleCam(){
+  const b=document.getElementById('camBtn');
+  if(stream){
+    stream.getTracks().forEach(t=>t.stop());stream=null;
+    b.innerText='🎥 ক্যামেরা চালু';b.classList.remove('on');
+    return;
+  }
+  try{
+    await startStream();
+    b.innerText='⏹️ ক্যামেরা বন্ধ';b.classList.add('on');
+    requestAnimationFrame(renderCinema);
+  }catch(e){alert('ক্যামেরা ও মাইক্রোফোন পারমিশন Allow করুন।');}
+}
+
+async function flipCam(){
+  facing=facing==='environment'?'user':'environment';
+  if(stream){
+    stream.getTracks().forEach(t=>t.stop());stream=null;
+    await new Promise(r=>setTimeout(r,350));
+    await startStream();
+  }
+}
+
+async function toggleTorch(){
+  if(!track)return;
+  const caps=track.getCapabilities?track.getCapabilities():{};
+  if(!caps.torch){alert('এই ক্যামেরায় টর্চ সাপোর্ট নেই');return;}
+  torchOn=!torchOn;
+  await track.applyConstraints({advanced:[{torch:torchOn}]});
+  document.getElementById('torchBtn').classList.toggle('on',torchOn);
+}
+
+function clamp(v){return v<0?0:v>255?255:v;}
+
+function renderCinema(){
+  if(!stream)return;
+  const W=cvs.width,H=cvs.height;
+  if(vid.readyState>=2){
+    const vw=vid.videoWidth,vh=vid.videoHeight;
+    const scale=Math.max(W/vw,H/vh),nw=vw*scale,nh=vh*scale;
+    ctx.drawImage(vid,(W-nw)/2,(H-nh)/2,nw,nh);
+
+    const img=ctx.getImageData(0,0,W,H),d=img.data;
+    const exp=parseInt(document.getElementById('exp').value)/100;
+    const con=parseInt(document.getElementById('con').value)/100;
+    const grainAmt=parseInt(document.getElementById('grain').value)*0.85;
+
+    for(let i=0;i<d.length;i+=4){
+      let r=d[i]*exp,g=d[i+1]*exp,b=d[i+2]*exp;
+      // Contrast
+      r=(r-128)*con+128;
+      g=(g-128)*con+128;
+      b=(b-128)*con+128;
+
+      const lum=0.299*r+0.587*g+0.114*b;
+
+      if(activeLUT==='teal'){
+        // Highlights warm orange, shadows deep teal
+        const w=lum/255;
+        r=r*(1+0.18*w)-12*(1-w);
+        g=g*(1+0.03*w)+6*(1-w);
+        b=b*(1-0.22*w)+24*(1-w);
+      }else if(activeLUT==='noir'){
+        const bw=(lum-128)*1.35+128;
+        r=bw;g=bw;b=bw*1.04;
+      }else if(activeLUT==='vintage'){
+        r=r*1.12+14;
+        g=g*1.03+8;
+        b=b*0.82+10;
+      }else if(activeLUT==='golden'){
+        r=r*1.18+16;
+        g=g*1.06+6;
+        b=b*0.76;
+      }else if(activeLUT==='cyber'){
+        r=r*0.78;
+        g=g*1.16+8;
+        b=b*1.14+14;
+      }
+
+      if(grainAmt>0){
+        const n=(Math.random()-0.5)*grainAmt;
+        r+=n;g+=n;b+=n;
+      }
+
+      d[i]=clamp(r);d[i+1]=clamp(g);d[i+2]=clamp(b);
+    }
+    ctx.putImageData(img,0,0);
+
+    // Vignette Overlay
+    const vigAmt=parseInt(document.getElementById('vig').value)/100;
+    if(vigAmt>0){
+      const grad=ctx.createRadialGradient(W/2,H/2,W*0.25,W/2,H/2,W*0.68);
+      grad.addColorStop(0,'rgba(0,0,0,0)');
+      grad.addColorStop(1,`rgba(0,0,0,${vigAmt})`);
+      ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
+    }
+
+    // Rule-of-Thirds Director Grid
+    if(showGrid){
+      ctx.strokeStyle='rgba(255,255,255,0.28)';ctx.lineWidth=1;
+      ctx.beginPath();
+      ctx.moveTo(W/3,0);ctx.lineTo(W/3,H);
+      ctx.moveTo((W/3)*2,0);ctx.lineTo((W/3)*2,H);
+      ctx.moveTo(0,H/3);ctx.lineTo(W,H/3);
+      ctx.moveTo(0,(H/3)*2);ctx.lineTo(W,(H/3)*2);
+      ctx.stroke();
+    }
+
+    // 2.39:1 Anamorphic Cinema Letterbox Bars
+    if(cineBars){
+      const barH=Math.round(H*0.125);
+      ctx.fillStyle='#000';
+      ctx.fillRect(0,0,W,barH);
+      ctx.fillRect(0,H-barH,W,barH);
+    }
+  }
+  requestAnimationFrame(renderCinema);
+}
+
+function captureStill(){
+  if(!stream)return;
+  const url=cvs.toDataURL('image/png');
+  const dl=document.getElementById('dlArea');
+  dl.style.display='block';
+  dl.innerHTML=`<a href="${url}" download="CINEMA_STILL_${Date.now()}.png" style="display:block;text-align:center;padding:9px;background:#06b6d4;color:#000;font-weight:bold;border-radius:6px;text-decoration:none;font-size:.78rem">⬇ সিনেমাটিক স্টিল ফ্রেম (PNG) ডাউনলোড করুন</a>`;
+}
+
+function toggleRecord(){
+  if(!stream){alert('আগে ক্যামেরা চালু করুন।');return;}
+  const btn=document.getElementById('recBtn');
+  if(isRec){
+    recorder.stop();isRec=false;
+    btn.innerText='🔴 REC সিনেমা';btn.classList.remove('on');
+    document.getElementById('recHud').innerHTML='● STANDBY';
+    return;
+  }
+  const cStream=cvs.captureStream(24);
+  stream.getAudioTracks().forEach(t=>cStream.addTrack(t));
+  chunks=[];
+  const types=['video/webm;codecs=vp8,opus','video/webm','video/mp4',''];
+  let opt={};
+  for(const t of types){
+    if(!t||MediaRecorder.isTypeSupported(t)){opt=t?{mimeType:t}:{};break;}
+  }
+  try{recorder=new MediaRecorder(cStream,opt);}catch(e){recorder=new MediaRecorder(cvs.captureStream(24));}
+  recorder.ondataavailable=e=>{if(e.data&&e.data.size>0)chunks.push(e.data);};
+  recorder.onstop=()=>{
+    const ext=(recorder.mimeType||'').includes('mp4')?'mp4':'webm';
+    const blob=new Blob(chunks,{type:recorder.mimeType||'video/webm'});
+    const url=URL.createObjectURL(blob);
+    const dl=document.getElementById('dlArea');
+    dl.style.display='block';
+    dl.innerHTML=`<a href="${url}" download="CINEMA_FILM_${Date.now()}.${ext}" style="display:block;text-align:center;padding:9px;background:#f59e0b;color:#000;font-weight:bold;border-radius:6px;text-decoration:none;font-size:.78rem">⬇ রেকর্ড করা সিনেমা ভিডিও ডাউনলোড করুন</a>`;
+  };
+  recorder.start(500);isRec=true;recStart=Date.now();
+  btn.innerText='⏹️ রেকর্ডিং সেভ';btn.classList.add('on');
+  document.getElementById('recHud').innerHTML='<span class="rec-dot">● REC 24FPS</span>';
+}
+</script>
+</body>
+</html>
