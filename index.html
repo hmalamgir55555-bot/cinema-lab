@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>CINEMA-LAB AI v5.1 // HD Audio DSP & GPU Studio</title>
+<title>CINEMA-LAB AI v5.2 // Zero-Lag Frame-Sync Studio</title>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
 <style>
 :root{--bg:#050608;--panel:#0e1117;--gold:#f59e0b;--cyan:#06b6d4;--red:#ef4444;--green:#10b981;--purple:#a855f7;--txt:#f8fafc;--mut:#94a3b8;--bd:#1e293b}
@@ -52,7 +52,7 @@ input[type=range]{width:100%;accent-color:var(--gold)}
 <body>
 
 <header>
-  <div><div class="brand">🎬 CINEMA-LAB AI v5.1</div><div class="sub">🎙️ 128KBPS HD AUDIO & GPU STUDIO</div></div>
+  <div><div class="brand">🎬 CINEMA-LAB AI v5.2</div><div class="sub">⚡ FRAME-SYNC ZERO-LAG STUDIO</div></div>
   <div class="badge" id="fpsBadge">360P • 30FPS</div>
 </header>
 
@@ -97,9 +97,9 @@ input[type=range]{width:100%;accent-color:var(--gold)}
     </div>
   </div>
 
-  <!-- STUDIO VOICE DSP RACK -->
+  <!-- LIGHTWEIGHT SINGLE-CHAIN VOICE DSP -->
   <div class="card">
-    <div class="ctitle"><span>🎙️ স্টুডিও ভয়েস ইফেক্ট (HD অডিও DSP)</span><span id="voiceTag" style="color:var(--purple)">STUDIO CLEAR</span></div>
+    <div class="ctitle"><span>🎙️ স্টুডিও ভয়েস ইফেক্ট (HD অডিও)</span><span id="voiceTag" style="color:var(--purple)">STUDIO CLEAR</span></div>
     <div class="vgrid">
       <button class="lbtn vbtn active" id="v-normal" onclick="setVoiceFX('normal','STUDIO CLEAR')">🎤 ক্লিয়ার ভয়েস</button>
       <button class="lbtn vbtn" id="v-radio" onclick="setVoiceFX('radio','BROADCAST NEWS')">📻 নিউজ / রেডিও</button>
@@ -161,13 +161,13 @@ input[type=range]{width:100%;accent-color:var(--gold)}
       <input type="range" id="blurVal" min="2" max="16" value="8" oninput="document.getElementById('blurLbl').innerText=this.value+'px'">
     </div>
     <div class="srow">
-      <div><span>Vignette (ফ্রেম ছায়া):</span><span id="vigLbl" style="color:var(--gold)">15%</span></div>
-      <input type="range" id="vig" min="0" max="85" value="15" oninput="document.getElementById('vigLbl').innerText=this.value+'%'">
+      <div><span>Vignette (ফ্রেম ছায়া):</span><span id="vigLbl" style="color:var(--gold)">0%</span></div>
+      <input type="range" id="vig" min="0" max="85" value="0" oninput="document.getElementById('vigLbl').innerText=this.value+'%'">
     </div>
     <div class="srow">
-      <div><span>Contrast (কনট্রাস্ট) & Brightness (আলো):</span><span id="ceLbl" style="color:var(--gold)">105% / 100%</span></div>
+      <div><span>Contrast (কনট্রাস্ট) & Brightness (আলো):</span><span id="ceLbl" style="color:var(--gold)">100% / 100%</span></div>
       <div style="display:flex;gap:8px">
-        <input type="range" id="con" min="80" max="155" value="105" oninput="updateCELbl()">
+        <input type="range" id="con" min="80" max="155" value="100" oninput="updateCELbl()">
         <input type="range" id="exp" min="60" max="145" value="100" oninput="updateCELbl()">
       </div>
     </div>
@@ -241,7 +241,7 @@ function syncBufferSizes(w,h){
   const bw=Math.round(w*0.5),bh=Math.round(h*0.5);
   if(bgCvs.width!==bw||bgCvs.height!==bh){bgCvs.width=bw;bgCvs.height=bh;}
   if(fgCvs.width!==w||fgCvs.height!==h){fgCvs.width=w;fgCvs.height=h;}
-  const vw=400,vh=Math.round(400*(h/w));
+  const vw=360,vh=Math.round(360*(h/w));
   if(vfxCvs.width!==vw||vfxCvs.height!==vh){vfxCvs.width=vw;vfxCvs.height=vh;}
 }
 
@@ -315,17 +315,47 @@ function toggleBars(){
   document.getElementById('barBtn').classList.toggle('on',cineBars);
 }
 
-// --- PARALLEL NON-CHOPPY STUDIO AUDIO DSP RACK ---
-let actx=null,audioDest=null,micSrc=null,inGain=null,monitorGain=null;
-let busGains={},voiceFX='normal',monitorOn=false;
+// --- SINGLE-CHAIN LOW-CPU AUDIO DSP ---
+let actx=null,audioDest=null,micSrc=null,inGain=null,masterComp=null,monitorGain=null;
+let fxNodes=[],voiceFX='normal',monitorOn=false;
 
-function makeDistortionCurve(amount){
-  const n=44100,curve=new Float32Array(n);
-  for(let i=0;i<n;i++){
-    const x=i*2/n-1;
-    curve[i]=((3+amount)*x*20*(Math.PI/180))/(Math.PI+amount*Math.abs(x));
+function rebuildActiveVoiceChain(){
+  if(!actx||!inGain||!masterComp)return;
+  // Disconnect old effect nodes so CPU stays 100% free for video
+  try{inGain.disconnect();}catch(e){}
+  fxNodes.forEach(n=>{try{n.disconnect();}catch(e){}});
+  fxNodes=[];
+
+  if(voiceFX==='normal'){
+    const eq=actx.createBiquadFilter();
+    eq.type='peaking';eq.frequency.value=3200;eq.Q.value=1.2;eq.gain.value=4;
+    inGain.connect(eq);eq.connect(masterComp);
+    fxNodes.push(eq);
+  }else if(voiceFX==='radio'){
+    const bass=actx.createBiquadFilter();bass.type='lowshelf';bass.frequency.value=180;bass.gain.value=10;
+    const crisp=actx.createBiquadFilter();crisp.type='peaking';crisp.frequency.value=3800;crisp.gain.value=7;
+    inGain.connect(bass);bass.connect(crisp);crisp.connect(masterComp);
+    fxNodes.push(bass,crisp);
+  }else if(voiceFX==='boss'){
+    const sub=actx.createBiquadFilter();sub.type='lowshelf';sub.frequency.value=160;sub.gain.value=15;
+    const hiCut=actx.createBiquadFilter();hiCut.type='highshelf';hiCut.frequency.value=2400;hiCut.gain.value=-6;
+    inGain.connect(sub);sub.connect(hiCut);hiCut.connect(masterComp);
+    fxNodes.push(sub,hiCut);
+  }else if(voiceFX==='echo'){
+    const delay=actx.createDelay();delay.delayTime.value=0.22;
+    const tone=actx.createBiquadFilter();tone.type='lowpass';tone.frequency.value=2400;
+    const fb=actx.createGain();fb.gain.value=0.40;
+    const wet=actx.createGain();wet.gain.value=0.62;
+    inGain.connect(masterComp); // Dry voice
+    inGain.connect(delay);delay.connect(tone);tone.connect(fb);fb.connect(delay);
+    tone.connect(wet);wet.connect(masterComp);
+    fxNodes.push(delay,tone,fb,wet);
+  }else if(voiceFX==='walkie'){
+    const bp=actx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=1450;bp.Q.value=1.5;
+    const boost=actx.createGain();boost.gain.value=1.6;
+    inGain.connect(bp);bp.connect(boost);boost.connect(masterComp);
+    fxNodes.push(bp,boost);
   }
-  return curve;
 }
 
 function initStudioAudioDSP(){
@@ -338,79 +368,24 @@ function initStudioAudioDSP(){
     if(micSrc){try{micSrc.disconnect();}catch(e){}}
     micSrc=actx.createMediaStreamSource(stream);
 
-    // Master Input & Limiter Compressor (eliminates clipping & stutter)
+    const hp=actx.createBiquadFilter();hp.type='highpass';hp.frequency.value=85;
     inGain=actx.createGain();
     inGain.gain.value=parseInt(document.getElementById('micGainSlider').value)/100;
 
-    const hpFilter=actx.createBiquadFilter();
-    hpFilter.type='highpass';hpFilter.frequency.value=85;
+    masterComp=actx.createDynamicsCompressor();
+    masterComp.threshold.value=-20;masterComp.knee.value=18;masterComp.ratio.value=4;
 
-    const masterComp=actx.createDynamicsCompressor();
-    masterComp.threshold.value=-20;
-    masterComp.knee.value=18;
-    masterComp.ratio.value=4;
-    masterComp.attack.value=0.005;
-    masterComp.release.value=0.15;
+    micSrc.connect(hp);
+    hp.connect(inGain);
 
-    micSrc.connect(hpFilter);
-    hpFilter.connect(inGain);
-
-    // 1. STUDIO CLEAR BUS
-    const gNormal=actx.createGain();
-    const clarityEQ=actx.createBiquadFilter();
-    clarityEQ.type='peaking';clarityEQ.frequency.value=3200;clarityEQ.Q.value=1.2;clarityEQ.gain.value=4;
-    inGain.connect(clarityEQ);clarityEQ.connect(gNormal);gNormal.connect(masterComp);
-
-    // 2. BROADCAST NEWS / RADIO BUS
-    const gRadio=actx.createGain();
-    const radBass=actx.createBiquadFilter();radBass.type='lowshelf';radBass.frequency.value=180;radBass.gain.value=10;
-    const radCrisp=actx.createBiquadFilter();radCrisp.type='peaking';radCrisp.frequency.value=3800;radCrisp.gain.value=7;
-    inGain.connect(radBass);radBass.connect(radCrisp);radCrisp.connect(gRadio);gRadio.connect(masterComp);
-
-    // 3. DEEP CINEMA VOICE BUS
-    const gBoss=actx.createGain();
-    const deepSub=actx.createBiquadFilter();deepSub.type='lowshelf';deepSub.frequency.value=160;deepSub.gain.value=15;
-    const deepMid=actx.createBiquadFilter();deepMid.type='peaking';deepMid.frequency.value=420;deepMid.gain.value=6;
-    const deepHigh=actx.createBiquadFilter();deepHigh.type='highshelf';deepHigh.frequency.value=2600;deepHigh.gain.value=-5;
-    inGain.connect(deepSub);deepSub.connect(deepMid);deepMid.connect(deepHigh);deepHigh.connect(gBoss);gBoss.connect(masterComp);
-
-    // 4. CONCERT ECHO / SINGING REVERB BUS (Dry + Smooth Damped Delay)
-    const gEcho=actx.createGain();
-    const delay=actx.createDelay();delay.delayTime.value=0.22;
-    const echoTone=actx.createBiquadFilter();echoTone.type='lowpass';echoTone.frequency.value=2400;
-    const fb=actx.createGain();fb.gain.value=0.42;
-    const wetMix=actx.createGain();wetMix.gain.value=0.65;
-    inGain.connect(gEcho); // Clean dry vocal
-    inGain.connect(delay);delay.connect(echoTone);echoTone.connect(fb);fb.connect(delay);
-    echoTone.connect(wetMix);wetMix.connect(gEcho);
-    gEcho.connect(masterComp);
-
-    // 5. WALKIE-TALKIE COMMS BUS (Clear Bandpass + Warm Saturation, Zero Chopping)
-    const gWalkie=actx.createGain();
-    const wBand=actx.createBiquadFilter();wBand.type='bandpass';wBand.frequency.value=1450;wBand.Q.value=1.4;
-    const wDrive=actx.createWaveShaper();wDrive.curve=makeDistortionCurve(25);
-    const wOut=actx.createGain();wOut.gain.value=1.35;
-    inGain.connect(wBand);wBand.connect(wDrive);wDrive.connect(wOut);wOut.connect(gWalkie);gWalkie.connect(masterComp);
-
-    busGains={normal:gNormal,radio:gRadio,boss:gBoss,echo:gEcho,walkie:gWalkie};
-
-    // Route Master Compressor to Recording Stream & Optional Live Monitor
     masterComp.connect(audioDest);
     monitorGain=actx.createGain();
     monitorGain.gain.value=monitorOn?0.85:0;
     masterComp.connect(monitorGain);
     monitorGain.connect(actx.destination);
 
-    applyActiveBus();
+    rebuildActiveVoiceChain();
   }catch(e){}
-}
-
-function applyActiveBus(){
-  if(!actx||!busGains.normal)return;
-  const now=actx.currentTime;
-  Object.keys(busGains).forEach(k=>{
-    busGains[k].gain.setTargetAtTime(k===voiceFX?1:0,now,0.03);
-  });
 }
 
 function updateMicGain(val){
@@ -424,7 +399,7 @@ function setVoiceFX(fx,label){
   document.getElementById('v-'+fx).classList.add('active');
   document.getElementById('voiceTag').innerText=label;
   if(actx&&actx.state==='suspended')actx.resume();
-  applyActiveBus();
+  rebuildActiveVoiceChain();
 }
 
 function toggleMicMonitor(){
@@ -444,13 +419,11 @@ async function openCamera(){
   const audioConstraints={
     echoCancellation:true,
     noiseSuppression:true,
-    autoGainControl:true,
-    sampleRate:48000,
-    channelCount:1
+    autoGainControl:true
   };
 
   const attempts=[
-    {video:{facingMode:facing,width:{ideal:1280},height:{ideal:720}},audio:audioConstraints},
+    {video:{facingMode:facing,width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30}},audio:audioConstraints},
     {video:{facingMode:facing},audio:true},
     {video:true,audio:true},
     {video:true,audio:false}
@@ -474,6 +447,15 @@ async function openCamera(){
   updateCanvasDimensions();
 }
 
+function scheduleNextFrame(){
+  if(!camActive)return;
+  if('requestVideoFrameCallback' in vid){
+    vid.requestVideoFrameCallback(renderCinema);
+  }else{
+    requestAnimationFrame(renderCinema);
+  }
+}
+
 async function toggleCam(){
   const b=document.getElementById('camBtn');
   if(camActive){
@@ -487,7 +469,7 @@ async function toggleCam(){
     await openCamera();
     camActive=true;
     b.innerText='⏹️ ক্যামেরা বন্ধ';b.classList.add('on');
-    requestAnimationFrame(renderCinema);
+    scheduleNextFrame();
   }catch(e){
     alert('ক্যামেরা চালু হয়নি: Chrome Permissions থেকে Camera ও Microphone Allow করুন।');
   }
@@ -504,7 +486,7 @@ async function flipCam(){
   if(camActive){
     if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
     await new Promise(r=>setTimeout(r,250));
-    try{await openCamera();}catch(e){alert('ক্যামেরা পরিবর্তন ব্যর্থ হয়েছে।');}
+    try{await openCamera();scheduleNextFrame();}catch(e){alert('ক্যামেরা পরিবর্তন ব্যর্থ হয়েছে।');}
   }
   fb.innerText='🔄 ক্যামেরা';
   switchingCam=false;
@@ -534,8 +516,9 @@ function drawSourceCover(targetCtx,src,W,H,mirror){
 function getGPUFilterString(){
   const exp=document.getElementById('exp').value;
   const con=document.getElementById('con').value;
-  let base=`brightness(${exp}%) contrast(${con}%)`;
+  if(activeLUT==='raw'&&exp==='100'&&con==='100')return 'none';
 
+  let base=`brightness(${exp}%) contrast(${con}%)`;
   if(activeLUT==='teal')return base+' saturate(135%) hue-rotate(-8deg)';
   if(activeLUT==='blockbuster')return base+' saturate(145%) contrast(118%)';
   if(activeLUT==='noir')return base+' grayscale(100%) contrast(145%) brightness(92%)';
@@ -630,7 +613,7 @@ function renderCinema(){
       if(blurMode&&segReady){
         const blurPx=document.getElementById('blurVal').value;
         bgCtx.save();
-        bgCtx.filter=`${gpuFilter} blur(${Math.max(2,Math.round(blurPx*0.6))}px)`;
+        bgCtx.filter=(gpuFilter==='none'?'':gpuFilter+' ')+`blur(${Math.max(2,Math.round(blurPx*0.6))}px)`;
         drawSourceCover(bgCtx,vid,bgCvs.width,bgCvs.height,mirrorCam);
         bgCtx.restore();
         ctx.drawImage(bgCvs,0,0,W,H);
@@ -645,10 +628,14 @@ function renderCinema(){
         fgCtx.restore();
         ctx.drawImage(fgCvs,0,0,W,H);
       }else{
-        ctx.save();
-        ctx.filter=gpuFilter;
-        drawSourceCover(ctx,vid,W,H,mirrorCam);
-        ctx.restore();
+        if(gpuFilter==='none'){
+          drawSourceCover(ctx,vid,W,H,mirrorCam);
+        }else{
+          ctx.save();
+          ctx.filter=gpuFilter;
+          drawSourceCover(ctx,vid,W,H,mirrorCam);
+          ctx.restore();
+        }
       }
 
       if(activeLUT==='teal'){
@@ -686,7 +673,7 @@ function renderCinema(){
       ctx.fillRect(0,H-barH,W,barH);
     }
   }
-  requestAnimationFrame(renderCinema);
+  scheduleNextFrame();
 }
 
 // --- 128KBPS HD AUDIO + VIDEO RECORDING ---
@@ -727,7 +714,6 @@ function toggleRecord(){
   const fps=fpsOptions[fpsIdx];
   const cStream=cvs.captureStream(fps);
 
-  // Route through Studio DSP Rack so all 5 voice modes & HD clarity work seamlessly
   if(audioDest&&audioDest.stream.getAudioTracks().length>0){
     audioDest.stream.getAudioTracks().forEach(t=>cStream.addTrack(t));
   }else if(stream){
