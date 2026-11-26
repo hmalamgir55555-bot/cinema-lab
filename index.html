@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>CINEMA-LAB AI v4.1 // Zero-Latency GPU Studio</title>
+<title>CINEMA-LAB AI v4.2 // Zero-Latency GPU Studio</title>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
 <style>
 :root{--bg:#050608;--panel:#0e1117;--gold:#f59e0b;--cyan:#06b6d4;--red:#ef4444;--green:#10b981;--purple:#a855f7;--txt:#f8fafc;--mut:#94a3b8;--bd:#1e293b}
@@ -52,8 +52,8 @@ input[type=range]{width:100%;accent-color:var(--gold)}
 <body>
 
 <header>
-  <div><div class="brand">🎬 CINEMA-LAB AI v4.1</div><div class="sub">⚡ ZERO-LATENCY GPU ENGINE</div></div>
-  <div class="badge" id="fpsBadge">1080P • 60FPS</div>
+  <div><div class="brand">🎬 CINEMA-LAB AI v4.2</div><div class="sub">⚡ ZERO-LATENCY GPU ENGINE</div></div>
+  <div class="badge" id="fpsBadge">1080P • 30FPS</div>
 </header>
 
 <div class="wrap">
@@ -66,7 +66,7 @@ input[type=range]{width:100%;accent-color:var(--gold)}
           <span id="lutHud">FX: NATURAL RAW</span>
         </div>
         <div class="hud-row">
-          <span id="camHud">CAM: BACK • 1080P • 60FPS</span>
+          <span id="camHud">CAM: BACK • 1080P • 30FPS</span>
           <span id="tcHud">00:00:00:00</span>
         </div>
       </div>
@@ -82,7 +82,7 @@ input[type=range]{width:100%;accent-color:var(--gold)}
     </div>
     <div class="row">
       <button class="btn btn-c on" id="resBtn" onclick="cycleRes()">💎 1080p FHD</button>
-      <button class="btn btn-p on" id="fpsBtn" onclick="cycleFPS()">⚡ FPS: 60</button>
+      <button class="btn btn-p on" id="fpsBtn" onclick="cycleFPS()">⚡ FPS: 30</button>
       <button class="btn" id="ratioBtn" onclick="cycleRatio()">📐 16:9 টিভি</button>
     </div>
     <div class="row" style="margin-bottom:0">
@@ -184,7 +184,7 @@ const resOptions=[
 let resIdx=1;
 
 const fpsOptions=[24,30,60];
-let fpsIdx=2; // Default 60 FPS for ultra-low latency
+let fpsIdx=1;
 
 const ratios=[
   {name:'16:9',label:'16:9 টিভি',css:'16/9'},
@@ -195,10 +195,8 @@ const ratios=[
 let rIdx=0;
 
 const vid=document.getElementById('vid');
-// Desynchronized context removes browser display pipeline latency
 const cvs=document.getElementById('cineCvs'),ctx=cvs.getContext('2d',{desynchronized:true,alpha:false});
 
-// Lightweight buffer ONLY for heavy pixel VFX & AI segmentation
 const vfxCvs=document.createElement('canvas'),vfxCtx=vfxCvs.getContext('2d',{willReadFrequently:true});
 const bgCvs=document.createElement('canvas'),bgCtx=bgCvs.getContext('2d');
 const maskCvs=document.createElement('canvas'),maskCtx=maskCvs.getContext('2d');
@@ -301,55 +299,57 @@ function toggleBars(){
 
 // --- LIVE VOICE DSP ENGINE ---
 function buildAudioGraph(){
-  if(!stream)return;
-  if(!actx)actx=new(window.AudioContext||window.webkitAudioContext)();
-  if(actx.state==='suspended')actx.resume();
-  if(!audioDest)audioDest=actx.createMediaStreamDestination();
+  if(!stream||stream.getAudioTracks().length===0)return;
+  try{
+    if(!actx)actx=new(window.AudioContext||window.webkitAudioContext)();
+    if(actx.state==='suspended')actx.resume();
+    if(!audioDest)audioDest=actx.createMediaStreamDestination();
 
-  activeNodes.forEach(n=>{try{n.disconnect();}catch(e){}});
-  activeNodes=[];
+    activeNodes.forEach(n=>{try{n.disconnect();}catch(e){}});
+    activeNodes=[];
 
-  micSrc=actx.createMediaStreamSource(stream);
-  activeNodes.push(micSrc);
-  let tail=micSrc;
+    micSrc=actx.createMediaStreamSource(stream);
+    activeNodes.push(micSrc);
+    let tail=micSrc;
 
-  if(voiceFX==='radio'){
-    const hp=actx.createBiquadFilter();hp.type='highpass';hp.frequency.value=110;
-    const bass=actx.createBiquadFilter();bass.type='lowshelf';bass.frequency.value=220;bass.gain.value=9;
-    const comp=actx.createDynamicsCompressor();comp.threshold.value=-24;comp.ratio.value=6;
-    micSrc.connect(hp);hp.connect(bass);bass.connect(comp);
-    activeNodes.push(hp,bass,comp);
-    tail=comp;
-  }else if(voiceFX==='boss'){
-    const low=actx.createBiquadFilter();low.type='lowpass';low.frequency.value=680;
-    const bass=actx.createBiquadFilter();bass.type='lowshelf';bass.frequency.value=180;bass.gain.value=14;
-    const subOsc=actx.createOscillator();subOsc.frequency.value=55;
-    const subGain=actx.createGain();subGain.gain.value=0.06;
-    subOsc.connect(subGain);subGain.connect(audioDest);subOsc.start();
-    micSrc.connect(low);low.connect(bass);
-    activeNodes.push(low,bass,subOsc,subGain);
-    tail=bass;
-  }else if(voiceFX==='robot'){
-    const bp=actx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=1100;bp.Q.value=2.5;
-    const osc=actx.createOscillator();osc.type='sawtooth';osc.frequency.value=48;
-    const modGain=actx.createGain();modGain.gain.value=0.6;
-    osc.connect(modGain.gain);osc.start();
-    micSrc.connect(bp);bp.connect(modGain);
-    activeNodes.push(bp,osc,modGain);
-    tail=modGain;
-  }else if(voiceFX==='echo'){
-    const delay=actx.createDelay();delay.delayTime.value=0.24;
-    const fb=actx.createGain();fb.gain.value=0.38;
-    delay.connect(fb);fb.connect(delay);
-    micSrc.connect(delay);
-    delay.connect(audioDest);
-    if(monitorOn)delay.connect(actx.destination);
-    activeNodes.push(delay,fb);
-    tail=micSrc;
-  }
+    if(voiceFX==='radio'){
+      const hp=actx.createBiquadFilter();hp.type='highpass';hp.frequency.value=110;
+      const bass=actx.createBiquadFilter();bass.type='lowshelf';bass.frequency.value=220;bass.gain.value=9;
+      const comp=actx.createDynamicsCompressor();comp.threshold.value=-24;comp.ratio.value=6;
+      micSrc.connect(hp);hp.connect(bass);bass.connect(comp);
+      activeNodes.push(hp,bass,comp);
+      tail=comp;
+    }else if(voiceFX==='boss'){
+      const low=actx.createBiquadFilter();low.type='lowpass';low.frequency.value=680;
+      const bass=actx.createBiquadFilter();bass.type='lowshelf';bass.frequency.value=180;bass.gain.value=14;
+      const subOsc=actx.createOscillator();subOsc.frequency.value=55;
+      const subGain=actx.createGain();subGain.gain.value=0.06;
+      subOsc.connect(subGain);subGain.connect(audioDest);subOsc.start();
+      micSrc.connect(low);low.connect(bass);
+      activeNodes.push(low,bass,subOsc,subGain);
+      tail=bass;
+    }else if(voiceFX==='robot'){
+      const bp=actx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=1100;bp.Q.value=2.5;
+      const osc=actx.createOscillator();osc.type='sawtooth';osc.frequency.value=48;
+      const modGain=actx.createGain();modGain.gain.value=0.6;
+      osc.connect(modGain.gain);osc.start();
+      micSrc.connect(bp);bp.connect(modGain);
+      activeNodes.push(bp,osc,modGain);
+      tail=modGain;
+    }else if(voiceFX==='echo'){
+      const delay=actx.createDelay();delay.delayTime.value=0.24;
+      const fb=actx.createGain();fb.gain.value=0.38;
+      delay.connect(fb);fb.connect(delay);
+      micSrc.connect(delay);
+      delay.connect(audioDest);
+      if(monitorOn)delay.connect(actx.destination);
+      activeNodes.push(delay,fb);
+      tail=micSrc;
+    }
 
-  tail.connect(audioDest);
-  if(monitorOn)tail.connect(actx.destination);
+    tail.connect(audioDest);
+    if(monitorOn)tail.connect(actx.destination);
+  }catch(e){}
 }
 
 function setVoiceFX(fx,label){
@@ -366,22 +366,33 @@ function toggleMicMonitor(){
   if(camActive)buildAudioGraph();
 }
 
-// --- CAMERA HARDWARE ---
+// --- CAMERA HARDWARE (UNIVERSAL FALLBACK) ---
 async function openCamera(){
   if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;track=null;torchOn=false;document.getElementById('torchBtn').classList.remove('on');}
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    throw new Error('এই ব্রাউজারে ক্যামেরা সাপোর্ট নেই। Chrome ব্যবহার করুন।');
+  }
   const res=resOptions[resIdx];
   const fps=fpsOptions[fpsIdx];
-  try{
-    stream=await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:facing,width:{ideal:res.long},height:{ideal:res.short},frameRate:{ideal:fps,min:24}},
-      audio:{echoCancellation:true,noiseSuppression:true}
-    });
-  }catch(e){
-    const devs=await navigator.mediaDevices.enumerateDevices();
-    const cams=devs.filter(d=>d.kind==='videoinput');
-    const tgt=facing==='environment'?cams[cams.length-1]:cams[0];
-    stream=await navigator.mediaDevices.getUserMedia({video:tgt?{deviceId:{exact:tgt.deviceId}}:true,audio:true});
+
+  const attempts=[
+    {video:{facingMode:facing,width:{ideal:res.long},height:{ideal:res.short},frameRate:{ideal:fps}},audio:true},
+    {video:{facingMode:facing},audio:true},
+    {video:true,audio:true},
+    {video:true,audio:false}
+  ];
+
+  let lastErr=null;
+  for(const constraints of attempts){
+    try{
+      stream=await navigator.mediaDevices.getUserMedia(constraints);
+      if(stream)break;
+    }catch(err){
+      lastErr=err;
+    }
   }
+  if(!stream)throw lastErr||new Error('ক্যামেরা চালু করা সম্ভব হয়নি');
+
   vid.srcObject=stream;
   await vid.play();
   track=stream.getVideoTracks()[0];
@@ -408,7 +419,9 @@ async function toggleCam(){
     camActive=true;
     b.innerText='⏹️ ক্যামেরা বন্ধ';b.classList.add('on');
     requestAnimationFrame(renderCinema);
-  }catch(e){alert('ক্যামেরা ও মাইক্রোফোন পারমিশন Allow করুন।');}
+  }catch(e){
+    alert('ক্যামেরা চালু হয়নি ('+(e.name||'Error')+'): ফোনের Settings > Apps > Chrome > Permissions থেকে Camera ও Microphone Allow করুন।');
+  }
 }
 
 async function flipCam(){
@@ -420,7 +433,7 @@ async function flipCam(){
   if(facing==='user'&&!mirrorCam)toggleMirror();
   if(facing==='environment'&&mirrorCam)toggleMirror();
   if(camActive){
-    try{await restartCameraSmooth();}catch(e){alert('আবার চেষ্টা করুন।');}
+    try{await restartCameraSmooth();}catch(e){alert('ক্যামেরা পরিবর্তন ব্যর্থ হয়েছে।');}
   }
   fb.innerText='🔄 ক্যামেরা';
   switchingCam=false;
@@ -447,7 +460,6 @@ function drawSourceCover(targetCtx,src,W,H,mirror){
   targetCtx.restore();
 }
 
-// Hardware GPU CSS Filter string builder (Zero CPU Overhead)
 function getGPUFilterString(){
   const exp=document.getElementById('exp').value;
   const con=document.getElementById('con').value;
@@ -477,7 +489,6 @@ function renderCinema(){
   if(stream&&vid.readyState>=2){
     const isCPUMode=cpuPixelModes.includes(activeLUT);
 
-    // Run AI Mask every 2nd frame for zero lag
     if(blurMode&&selfieSeg&&!segBusy){
       segFrameSkip=(segFrameSkip+1)%2;
       if(segFrameSkip===0){
@@ -487,7 +498,6 @@ function renderCinema(){
     }
 
     if(isCPUMode){
-      // Fast 480px internal buffer for pixel-level VFX
       const pW=480,pH=Math.round(480*(H/W));
       vfxCvs.width=pW;vfxCvs.height=pH;
       drawSourceCover(vfxCtx,vid,pW,pH,mirrorCam);
@@ -543,12 +553,10 @@ function renderCinema(){
       vfxCtx.putImageData(img,0,0);
       ctx.drawImage(vfxCvs,0,0,W,H);
     }else{
-      // ZERO-LATENCY GPU HARDWARE PATH
       const gpuFilter=getGPUFilterString();
 
       if(blurMode&&segReady){
         const blurPx=document.getElementById('blurVal').value;
-        // Draw blurred background at half-res for speed
         bgCvs.width=Math.round(W*0.4);bgCvs.height=Math.round(H*0.4);
         bgCtx.save();
         bgCtx.filter=`${gpuFilter} blur(${Math.max(2,Math.round(blurPx*0.5))}px)`;
@@ -556,7 +564,6 @@ function renderCinema(){
         bgCtx.restore();
         ctx.drawImage(bgCvs,0,0,W,H);
 
-        // Draw sharp subject with feathered mask
         fgCvs.width=Math.round(W*0.6);fgCvs.height=Math.round(H*0.6);
         fgCtx.save();
         fgCtx.clearRect(0,0,fgCvs.width,fgCvs.height);
@@ -574,7 +581,6 @@ function renderCinema(){
         ctx.restore();
       }
 
-      // Color tint overlays for specific LUTs
       if(activeLUT==='teal'){
         ctx.save();ctx.globalCompositeOperation='overlay';
         ctx.fillStyle='rgba(0, 145, 175, 0.22)';ctx.fillRect(0,0,W,H);
@@ -613,7 +619,6 @@ function renderCinema(){
   requestAnimationFrame(renderCinema);
 }
 
-// --- SAVE PHOTO & VIDEO ---
 function captureStill(){
   if(!camActive)return;
   const url=cvs.toDataURL('image/png');
