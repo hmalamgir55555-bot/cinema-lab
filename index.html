@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>CINEMA-LAB AI v4.6 // Rock-Solid Recorder & GPU Studio</title>
+<title>CINEMA-LAB AI v5.0 // Fast Mobile Studio</title>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
 <style>
 :root{--bg:#050608;--panel:#0e1117;--gold:#f59e0b;--cyan:#06b6d4;--red:#ef4444;--green:#10b981;--purple:#a855f7;--txt:#f8fafc;--mut:#94a3b8;--bd:#1e293b}
@@ -47,35 +47,33 @@ canvas#cineCvs{width:100%;height:100%;object-fit:contain;display:block}
 .srow div{display:flex;justify-content:space-between;margin-bottom:3px}
 input[type=range]{width:100%;accent-color:var(--gold)}
 .save-box{background:#06120e;border:2px solid var(--green);border-radius:8px;padding:10px;margin-bottom:10px;box-shadow:0 0 18px rgba(16,185,129,.25)}
-.rec-bar{background:rgba(239,68,68,.15);border:1px solid var(--red);color:#fca5a5;padding:7px;border-radius:6px;font-size:.73rem;text-align:center;font-weight:bold;margin-bottom:8px;display:none}
 </style>
 </head>
 <body>
 
 <header>
-  <div><div class="brand">🎬 CINEMA-LAB AI v4.6</div><div class="sub">⚡ STABLE VP8 RECORDER & GPU STUDIO</div></div>
-  <div class="badge" id="fpsBadge">HD • 30FPS</div>
+  <div><div class="brand">🎬 CINEMA-LAB AI v5.0</div><div class="sub">⚡ MOBILE HARDWARE ENGINE</div></div>
+  <div class="badge" id="fpsBadge">SD+ • 30FPS</div>
 </header>
 
 <div class="wrap">
   <div class="vf-wrap">
     <div class="viewfinder" id="vfBox">
-      <canvas id="cineCvs" width="960" height="540"></canvas>
+      <canvas id="cineCvs" width="640" height="360"></canvas>
       <div class="hud">
         <div class="hud-row">
           <span id="recHud">● STANDBY</span>
           <span id="lutHud">FX: NATURAL RAW</span>
         </div>
         <div class="hud-row">
-          <span id="camHud">CAM: BACK • HD • 30FPS</span>
+          <span id="camHud">CAM: BACK • 640x360</span>
           <span id="tcHud">00:00:00:00</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- LIVE RECORDING INDICATOR & DOWNLOAD BOX -->
-  <div class="rec-bar" id="recStatusBar">🔴 রেকর্ডিং চলছে... থামাতে "⏹️ সেভ করুন" বাটনে চাপ দিন</div>
+  <!-- DOWNLOAD & PREVIEW AREA -->
   <div id="dlArea" style="display:none"></div>
 
   <!-- CAMERA, QUALITY, FPS & SAVE CONTROLS -->
@@ -86,7 +84,7 @@ input[type=range]{width:100%;accent-color:var(--gold)}
       <button class="btn btn-c" onclick="captureStill()">📸 স্টিল ছবি</button>
     </div>
     <div class="row">
-      <button class="btn btn-c on" id="resBtn" onclick="cycleRes()">💎 কোয়ালিটি: HD</button>
+      <button class="btn btn-c on" id="resBtn" onclick="cycleRes()">💎 কোয়ালিটি: 360p</button>
       <button class="btn btn-p on" id="fpsBtn" onclick="cycleFPS()">⚡ FPS: 30</button>
       <button class="btn" id="ratioBtn" onclick="cycleRatio()">📐 16:9 টিভি</button>
     </div>
@@ -177,14 +175,14 @@ input[type=range]{width:100%;accent-color:var(--gold)}
 <script>
 let stream=null,track=null,facing='environment',torchOn=false,camActive=false,switchingCam=false;
 let activeLUT='raw',cineBars=false,mirrorCam=false,blurMode=false;
-let recorder=null,chunks=[],recordedBytes=0,isRec=false,recStart=0,frameCount=0,lastVideoBlob=null,lastVideoName='',stopGuardTimer=null,finalized=false;
+let recorder=null,chunks=[],recordedBytes=0,isRec=false,recStart=0,frameCount=0,lastVideoBlob=null,lastVideoName='';
 
-// Balanced resolutions so mobile MediaRecorder never stalls
+// Proven mobile-safe canvas resolutions (360p default guarantees instant zero-lag recording)
 const resOptions=[
-  {label:'HD 540p',long:960,short:540},
+  {label:'360p Fast',long:640,short:360},
+  {label:'480p SD',long:854,short:480},
   {label:'720p HD',long:1280,short:720},
-  {label:'1080p FHD',long:1920,short:1080},
-  {label:'4K UHD',long:2560,short:1440}
+  {label:'1080p FHD',long:1920,short:1080}
 ];
 let resIdx=0;
 
@@ -212,9 +210,9 @@ if(typeof SelfieSegmentation!=='undefined'){
   selfieSeg=new SelfieSegmentation({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${f}`});
   selfieSeg.setOptions({modelSelection:1,selfieMode:false});
   selfieSeg.onResults(res=>{
-    if(maskCvs.width!==320||maskCvs.height!==180){maskCvs.width=320;maskCvs.height=180;}
-    maskCtx.clearRect(0,0,320,180);
-    maskCtx.drawImage(res.segmentationMask,0,0,320,180);
+    if(maskCvs.width!==256||maskCvs.height!==144){maskCvs.width=256;maskCvs.height=144;}
+    maskCtx.clearRect(0,0,256,144);
+    maskCtx.drawImage(res.segmentationMask,0,0,256,144);
     segReady=true;segBusy=false;
   });
 }
@@ -230,7 +228,6 @@ setInterval(()=>{
     const mb=(recordedBytes/(1024*1024)).toFixed(1);
     document.getElementById('tcHud').innerText=`${m}:${s}:${fStr}`;
     document.getElementById('recHud').innerHTML=`<span class="rec-dot">● REC ${m}:${s} (${mb}MB)</span>`;
-    document.getElementById('recStatusBar').innerText=`🔴 রেকর্ডিং চলছে: ${m}:${s} (${mb} MB) — সেভ করতে লাল বাটনে চাপ দিন`;
   }else{
     document.getElementById('tcHud').innerText=new Date().toTimeString().split(' ')[0]+':'+fStr;
   }
@@ -238,11 +235,10 @@ setInterval(()=>{
 
 function syncBufferSizes(w,h){
   if(cvs.width!==w||cvs.height!==h){cvs.width=w;cvs.height=h;}
-  const bw=Math.round(w*0.4),bh=Math.round(h*0.4);
+  const bw=Math.round(w*0.5),bh=Math.round(h*0.5);
   if(bgCvs.width!==bw||bgCvs.height!==bh){bgCvs.width=bw;bgCvs.height=bh;}
-  const fw=Math.round(w*0.6),fh=Math.round(h*0.6);
-  if(fgCvs.width!==fw||fgCvs.height!==fh){fgCvs.width=fw;fgCvs.height=fh;}
-  const vw=480,vh=Math.round(480*(h/w));
+  if(fgCvs.width!==w||fgCvs.height!==h){fgCvs.width=w;fgCvs.height=h;}
+  const vw=400,vh=Math.round(400*(h/w));
   if(vfxCvs.width!==vw||vfxCvs.height!==vh){vfxCvs.width=vw;vfxCvs.height=vh;}
 }
 
@@ -255,24 +251,22 @@ function updateCanvasDimensions(){
   else if(r.name==='1:1'){w=res.short;h=res.short;}
   syncBufferSizes(w,h);
   document.getElementById('vfBox').style.aspectRatio=r.css;
-  document.getElementById('fpsBadge').innerText=`${res.label} • ${fpsOptions[fpsIdx]}FPS`;
-  document.getElementById('camHud').innerText=`CAM: ${facing==='environment'?'BACK':'FRONT'} • ${w}x${h} • ${fpsOptions[fpsIdx]}FPS`;
+  document.getElementById('fpsBadge').innerText=`${res.label.split(' ')[0]} • ${fpsOptions[fpsIdx]}FPS`;
+  document.getElementById('camHud').innerText=`CAM: ${facing==='environment'?'BACK':'FRONT'} • ${w}x${h}`;
 }
 
-async function cycleRes(){
+function cycleRes(){
   if(isRec){alert('রেকর্ডিং বন্ধ করে কোয়ালিটি পরিবর্তন করুন।');return;}
   resIdx=(resIdx+1)%resOptions.length;
   document.getElementById('resBtn').innerText='💎 '+resOptions[resIdx].label;
   updateCanvasDimensions();
-  if(camActive)await restartCameraSmooth();
 }
 
-async function cycleFPS(){
+function cycleFPS(){
   if(isRec){alert('রেকর্ডিং বন্ধ করে FPS পরিবর্তন করুন।');return;}
   fpsIdx=(fpsIdx+1)%fpsOptions.length;
   document.getElementById('fpsBtn').innerText='⚡ FPS: '+fpsOptions[fpsIdx];
   updateCanvasDimensions();
-  if(camActive)await restartCameraSmooth();
 }
 
 function cycleRatio(){
@@ -318,9 +312,12 @@ function toggleBars(){
   document.getElementById('barBtn').classList.toggle('on',cineBars);
 }
 
-// --- LIVE VOICE DSP ENGINE ---
+// --- ON-DEMAND VOICE DSP ENGINE (ONLY RUNS WHEN EFFECT SELECTED) ---
+let actx=null,audioDest=null,micSrc=null,voiceFX='normal',monitorOn=false,activeNodes=[];
+
 function buildAudioGraph(){
   if(!stream||stream.getAudioTracks().length===0)return;
+  if(voiceFX==='normal'&&!monitorOn)return; // Do NOT lock mic stream when using normal voice!
   try{
     if(!actx)actx=new(window.AudioContext||window.webkitAudioContext)();
     if(actx.state==='suspended')actx.resume();
@@ -343,11 +340,8 @@ function buildAudioGraph(){
     }else if(voiceFX==='boss'){
       const low=actx.createBiquadFilter();low.type='lowpass';low.frequency.value=680;
       const bass=actx.createBiquadFilter();bass.type='lowshelf';bass.frequency.value=180;bass.gain.value=14;
-      const subOsc=actx.createOscillator();subOsc.frequency.value=55;
-      const subGain=actx.createGain();subGain.gain.value=0.06;
-      subOsc.connect(subGain);subGain.connect(audioDest);subOsc.start();
       micSrc.connect(low);low.connect(bass);
-      activeNodes.push(low,bass,subOsc,subGain);
+      activeNodes.push(low,bass);
       tail=bass;
     }else if(voiceFX==='robot'){
       const bp=actx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=1100;bp.Q.value=2.5;
@@ -393,11 +387,9 @@ async function openCamera(){
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
     throw new Error('এই ব্রাউজারে ক্যামেরা সাপোর্ট নেই।');
   }
-  const res=resOptions[resIdx];
-  const fps=fpsOptions[fpsIdx];
 
   const attempts=[
-    {video:{facingMode:facing,width:{ideal:res.long},height:{ideal:res.short},frameRate:{ideal:fps}},audio:true},
+    {video:{facingMode:facing,width:{ideal:1280},height:{ideal:720}},audio:true},
     {video:{facingMode:facing},audio:true},
     {video:true,audio:true},
     {video:true,audio:false}
@@ -421,12 +413,6 @@ async function openCamera(){
   updateCanvasDimensions();
 }
 
-async function restartCameraSmooth(){
-  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
-  await new Promise(r=>setTimeout(r,250));
-  await openCamera();
-}
-
 async function toggleCam(){
   const b=document.getElementById('camBtn');
   if(camActive){
@@ -442,7 +428,7 @@ async function toggleCam(){
     b.innerText='⏹️ ক্যামেরা বন্ধ';b.classList.add('on');
     requestAnimationFrame(renderCinema);
   }catch(e){
-    alert('ক্যামেরা চালু হয়নি ('+(e.name||'Error')+'): Chrome Permissions থেকে Camera Allow করুন।');
+    alert('ক্যামেরা চালু হয়নি: Chrome Permissions থেকে Camera Allow করুন।');
   }
 }
 
@@ -455,7 +441,9 @@ async function flipCam(){
   if(facing==='user'&&!mirrorCam)toggleMirror();
   if(facing==='environment'&&mirrorCam)toggleMirror();
   if(camActive){
-    try{await restartCameraSmooth();}catch(e){alert('ক্যামেরা পরিবর্তন ব্যর্থ হয়েছে।');}
+    if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+    await new Promise(r=>setTimeout(r,250));
+    try{await openCamera();}catch(e){alert('ক্যামেরা পরিবর্তন ব্যর্থ হয়েছে।');}
   }
   fb.innerText='🔄 ক্যামেরা';
   switchingCam=false;
@@ -581,7 +569,7 @@ function renderCinema(){
       if(blurMode&&segReady){
         const blurPx=document.getElementById('blurVal').value;
         bgCtx.save();
-        bgCtx.filter=`${gpuFilter} blur(${Math.max(2,Math.round(blurPx*0.5))}px)`;
+        bgCtx.filter=`${gpuFilter} blur(${Math.max(2,Math.round(blurPx*0.6))}px)`;
         drawSourceCover(bgCtx,vid,bgCvs.width,bgCvs.height,mirrorCam);
         bgCtx.restore();
         ctx.drawImage(bgCvs,0,0,W,H);
@@ -640,17 +628,13 @@ function renderCinema(){
   requestAnimationFrame(renderCinema);
 }
 
-// --- ROCK-SOLID VP8/WEBM RECORDER (SAME AS v3.0 + SAFETY FLUSH) ---
+// --- EXACT v3.0 PROVEN SAVE & RECORDING ENGINE ---
 function captureStill(){
   if(!camActive){alert('আগে ক্যামেরা চালু করুন।');return;}
   const url=cvs.toDataURL('image/png');
-  const fname=`CINEMA_PHOTO_${Date.now()}.png`;
   const dl=document.getElementById('dlArea');
   dl.style.display='block';
-  dl.innerHTML=`<div class="save-box">
-    <div style="font-size:.75rem;color:#06b6d4;margin-bottom:6px;text-align:center;font-weight:bold">📸 ছবি প্রস্তুত! নিচের বাটনে চাপ দিয়ে সেভ করুন</div>
-    <a href="${url}" download="${fname}" class="btn btn-c on" style="display:block;text-decoration:none">⬇ গ্যালারিতে ছবি সেভ করুন (PNG)</a>
-  </div>`;
+  dl.innerHTML=`<div class="save-box"><a href="${url}" download="STUDIO_PHOTO_${Date.now()}.png" style="display:block;text-align:center;padding:10px;background:#06b6d4;color:#000;font-weight:bold;border-radius:6px;text-decoration:none;font-size:.8rem">⬇ ফিল্টার করা ছবি (PNG) ডাউনলোড করুন</a></div>`;
 }
 
 async function shareLastVideo(){
@@ -659,44 +643,8 @@ async function shareLastVideo(){
   if(navigator.canShare&&navigator.canShare({files:[file]})){
     try{await navigator.share({files:[file],title:'Cinema-Lab Video'});}catch(e){}
   }else{
-    alert('বামপাশের সবুজ "⬇ ভিডিও ডাউনলোড করুন" বাটনে চাপ দিন।');
+    alert('বামপাশের সবুজ ডাউনলোড বাটনে চাপ দিয়ে ভিডিওটি সেভ করুন।');
   }
-}
-
-function finalizeRecording(){
-  if(finalized)return;
-  finalized=true;
-  clearTimeout(stopGuardTimer);
-
-  const btn=document.getElementById('recBtn');
-  btn.innerText='🔴 REC ভিডিও';
-  btn.classList.remove('on');
-  document.getElementById('recHud').innerHTML='● STANDBY';
-  document.getElementById('recStatusBar').style.display='none';
-
-  if(chunks.length===0){
-    alert('কোনো ভিডিও ডেটা রেকর্ড হয়নি। অন্তত ২ সেকেন্ড রেকর্ড করে তারপর বন্ধ করুন।');
-    return;
-  }
-
-  const mime=(recorder&&recorder.mimeType)?recorder.mimeType:'video/webm';
-  const ext=mime.includes('mp4')?'mp4':'webm';
-  lastVideoBlob=new Blob(chunks,{type:mime});
-  lastVideoName=`CINEMA_LAB_${Date.now()}.${ext}`;
-  const url=URL.createObjectURL(lastVideoBlob);
-  const sizeMB=(lastVideoBlob.size/(1024*1024)).toFixed(2);
-
-  const dl=document.getElementById('dlArea');
-  dl.style.display='block';
-  dl.innerHTML=`<div class="save-box">
-    <div style="font-size:.76rem;color:#10b981;margin-bottom:6px;text-align:center;font-weight:bold">✅ ভিডিও সেভের জন্য প্রস্তুত (${sizeMB} MB)</div>
-    <video src="${url}" controls playsinline style="width:100%;max-height:200px;border-radius:6px;background:#000;margin-bottom:8px;border:1px solid #1e293b"></video>
-    <div class="row" style="margin-bottom:0">
-      <a href="${url}" download="${lastVideoName}" class="btn btn-g on" style="text-decoration:none;flex:2;padding:11px 6px;font-size:.76rem">⬇ ভিডিও ডাউনলোড করুন</a>
-      <button class="btn btn-c" onclick="shareLastVideo()" style="flex:1;padding:11px 6px">📤 শেয়ার</button>
-    </div>
-  </div>`;
-  dl.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
 function toggleRecord(){
@@ -704,48 +652,31 @@ function toggleRecord(){
   const btn=document.getElementById('recBtn');
 
   if(isRec){
+    recorder.stop();
     isRec=false;
-    btn.innerText='⏳ সেভ হচ্ছে...';
+    btn.innerText='🔴 REC ভিডিও';
     btn.classList.remove('on');
-    document.getElementById('recHud').innerHTML='● SAVING...';
-    try{
-      if(recorder&&recorder.state!=='inactive')recorder.stop();
-    }catch(e){}
-    // Force finalize within 1.2s even if browser delays onstop event
-    stopGuardTimer=setTimeout(finalizeRecording,1200);
+    document.getElementById('recHud').innerHTML='● STANDBY';
     return;
   }
 
   document.getElementById('dlArea').style.display='none';
-  chunks=[];
-  recordedBytes=0;
-  finalized=false;
-
   const fps=fpsOptions[fpsIdx];
   const cStream=cvs.captureStream(fps);
 
-  // Use processed audio only when Voice FX is active, otherwise use raw mic track (proven stable)
+  // Attach audio cleanly (only use audioDest if voice FX is turned ON)
   if(voiceFX!=='normal'&&audioDest&&audioDest.stream.getAudioTracks().length>0){
     audioDest.stream.getAudioTracks().forEach(t=>cStream.addTrack(t));
-  }else if(stream&&stream.getAudioTracks().length>0){
+  }else if(stream){
     stream.getAudioTracks().forEach(t=>cStream.addTrack(t));
   }
 
-  // Proven v3.0 codec priority: WebM VP8 first (never hangs on Android captureStream)
-  const types=[
-    'video/webm;codecs=vp8,opus',
-    'video/webm;codecs=vp9,opus',
-    'video/webm',
-    'video/mp4',
-    ''
-  ];
-
+  chunks=[];
+  recordedBytes=0;
+  const types=['video/webm;codecs=vp8,opus','video/webm','video/mp4',''];
   let opt={};
   for(const t of types){
-    if(!t||MediaRecorder.isTypeSupported(t)){
-      opt=t?{mimeType:t}:{};
-      break;
-    }
+    if(!t||MediaRecorder.isTypeSupported(t)){opt=t?{mimeType:t}:{};break;}
   }
 
   try{
@@ -761,18 +692,35 @@ function toggleRecord(){
     }
   };
 
-  recorder.onstop=finalizeRecording;
+  recorder.onstop=()=>{
+    if(chunks.length===0){
+      alert('ভিডিও রেকর্ড হয়নি। কোয়ালিটি 360p রেখে অন্তত ৩ সেকেন্ড রেকর্ড করুন।');
+      return;
+    }
+    const mime=recorder.mimeType||'video/webm';
+    const ext=mime.includes('mp4')?'mp4':'webm';
+    lastVideoBlob=new Blob(chunks,{type:mime});
+    lastVideoName=`STUDIO_VIDEO_${Date.now()}.${ext}`;
+    const url=URL.createObjectURL(lastVideoBlob);
+    const sizeMB=(lastVideoBlob.size/(1024*1024)).toFixed(2);
+    const dl=document.getElementById('dlArea');
+    dl.style.display='block';
+    dl.innerHTML=`<div class="save-box">
+      <div style="font-size:.75rem;color:#10b981;margin-bottom:6px;text-align:center;font-weight:bold">✅ ভিডিও সেভের জন্য প্রস্তুত (${sizeMB} MB)</div>
+      <video src="${url}" controls playsinline style="width:100%;max-height:190px;border-radius:6px;background:#000;margin-bottom:8px;border:1px solid #1e293b"></video>
+      <div class="row" style="margin-bottom:0">
+        <a href="${url}" download="${lastVideoName}" style="flex:2;display:block;text-align:center;padding:10px;background:#f59e0b;color:#000;font-weight:bold;border-radius:6px;text-decoration:none;font-size:.8rem">⬇ রেকর্ড করা ভিডিও ডাউনলোড করুন</a>
+        <button class="btn btn-c" onclick="shareLastVideo()" style="flex:1">📤 শেয়ার</button>
+      </div>
+    </div>`;
+  };
 
-  try{
-    recorder.start(300);
-    isRec=true;
-    recStart=Date.now();
-    document.getElementById('recStatusBar').style.display='block';
-    btn.innerText='⏹️ সেভ করুন';
-    btn.classList.add('on');
-  }catch(err){
-    alert('রেকর্ডিং শুরু করা যায়নি: '+err.message);
-  }
+  recorder.start(500);
+  isRec=true;
+  recStart=Date.now();
+  btn.innerText='⏹️ রেকর্ডিং সেভ';
+  btn.classList.add('on');
+  document.getElementById('recHud').innerHTML=`<span class="rec-dot">● REC ${fps}FPS</span>`;
 }
 </script>
 </body>
