@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>CINEMA-LAB AI v4.0 // 4K • Optical Bokeh • Voice FX</title>
+<title>CINEMA-LAB AI v4.1 // Zero-Latency GPU Studio</title>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
 <style>
 :root{--bg:#050608;--panel:#0e1117;--gold:#f59e0b;--cyan:#06b6d4;--red:#ef4444;--green:#10b981;--purple:#a855f7;--txt:#f8fafc;--mut:#94a3b8;--bd:#1e293b}
@@ -11,7 +11,7 @@
 body{margin:0;background:var(--bg);color:var(--txt);padding-bottom:50px}
 header{background:var(--panel);padding:10px 14px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:50}
 .brand{font-size:.95rem;font-weight:800;color:var(--gold);letter-spacing:.8px}
-.sub{font-size:.63rem;color:var(--mut);font-family:monospace}
+.sub{font-size:.63rem;color:var(--green);font-family:monospace}
 .badge{font-size:.66rem;padding:4px 8px;border-radius:4px;border:1px solid var(--gold);color:var(--gold);background:rgba(245,158,11,.12);font-family:monospace;font-weight:bold}
 .wrap{max-width:540px;margin:0 auto;padding:10px}
 .vf-wrap{display:flex;justify-content:center;background:#020305;border:2px solid var(--bd);border-radius:8px;overflow:hidden;margin-bottom:10px;box-shadow:0 0 28px rgba(245,158,11,.14)}
@@ -52,8 +52,8 @@ input[type=range]{width:100%;accent-color:var(--gold)}
 <body>
 
 <header>
-  <div><div class="brand">🎬 CINEMA-LAB AI v4.0</div><div class="sub">4K UHD • OPTICAL BOKEH • VOICE FX</div></div>
-  <div class="badge" id="fpsBadge">1080P • 30FPS</div>
+  <div><div class="brand">🎬 CINEMA-LAB AI v4.1</div><div class="sub">⚡ ZERO-LATENCY GPU ENGINE</div></div>
+  <div class="badge" id="fpsBadge">1080P • 60FPS</div>
 </header>
 
 <div class="wrap">
@@ -66,7 +66,7 @@ input[type=range]{width:100%;accent-color:var(--gold)}
           <span id="lutHud">FX: NATURAL RAW</span>
         </div>
         <div class="hud-row">
-          <span id="camHud">CAM: BACK • 1080P • 30FPS</span>
+          <span id="camHud">CAM: BACK • 1080P • 60FPS</span>
           <span id="tcHud">00:00:00:00</span>
         </div>
       </div>
@@ -81,8 +81,8 @@ input[type=range]{width:100%;accent-color:var(--gold)}
       <button class="btn btn-c" onclick="captureStill()">📸 স্টিল ছবি</button>
     </div>
     <div class="row">
-      <button class="btn btn-c on" id="resBtn" onclick="cycleRes()">💎 কোয়ালিটি: 1080p</button>
-      <button class="btn btn-p on" id="fpsBtn" onclick="cycleFPS()">⚡ FPS: 30</button>
+      <button class="btn btn-c on" id="resBtn" onclick="cycleRes()">💎 1080p FHD</button>
+      <button class="btn btn-p on" id="fpsBtn" onclick="cycleFPS()">⚡ FPS: 60</button>
       <button class="btn" id="ratioBtn" onclick="cycleRatio()">📐 16:9 টিভি</button>
     </div>
     <div class="row" style="margin-bottom:0">
@@ -105,33 +105,6 @@ input[type=range]{width:100%;accent-color:var(--gold)}
       <button class="lbtn vbtn" id="v-robot" onclick="setVoiceFX('robot','CYBORG COMMS')">🤖 রোবট / ওয়াকি</button>
       <button class="lbtn vbtn" id="v-echo" onclick="setVoiceFX('echo','STUDIO ECHO')">🏛️ স্টুডিও ইকো</button>
       <button class="lbtn vbtn" id="v-monitor" onclick="toggleMicMonitor()">🎧 হেডফোন টেস্ট</button>
-    </div>
-  </div>
-
-  <!-- NATURAL OPTICAL BOKEH & LENS TUNING -->
-  <div class="card">
-    <div class="ctitle"><span>🌫️ ন্যাচারাল DSLR ব্লার ও লেন্স টিউনিং</span><span>OPTICAL ENGINE</span></div>
-    <div class="srow">
-      <div><span>Optical Bokeh Blur (প্রাকৃতিক ব্যাকগ্রাউন্ড ব্লার):</span><span id="blurLbl" style="color:var(--green)">8px</span></div>
-      <input type="range" id="blurVal" min="2" max="18" value="8" oninput="document.getElementById('blurLbl').innerText=this.value+'px'">
-    </div>
-    <div class="srow">
-      <div><span>Edge Softness (শরীরের কিনারা মসৃণতা):</span><span id="featherLbl" style="color:var(--green)">6px</span></div>
-      <input type="range" id="featherVal" min="1" max="14" value="6" oninput="document.getElementById('featherLbl').innerText=this.value+'px'">
-    </div>
-    <div class="srow">
-      <div><span>Film Grain (ফিল্ম দানা) & Vignette (ছায়া):</span><span id="gvLbl" style="color:var(--gold)">0% / 15%</span></div>
-      <div style="display:flex;gap:8px">
-        <input type="range" id="grain" min="0" max="50" value="0" oninput="updateGVLbl()">
-        <input type="range" id="vig" min="0" max="85" value="15" oninput="updateGVLbl()">
-      </div>
-    </div>
-    <div class="srow">
-      <div><span>Contrast (কনট্রাস্ট) & Exposure (আলো):</span><span id="ceLbl" style="color:var(--gold)">105% / 100%</span></div>
-      <div style="display:flex;gap:8px">
-        <input type="range" id="con" min="80" max="155" value="105" oninput="updateCELbl()">
-        <input type="range" id="exp" min="60" max="145" value="100" oninput="updateCELbl()">
-      </div>
     </div>
   </div>
 
@@ -173,6 +146,26 @@ input[type=range]{width:100%;accent-color:var(--gold)}
       <button class="lbtn" id="l-xray" onclick="setLUT('xray','X-RAY NEGATIVE')">🩻 X-RAY VIEW</button>
     </div>
   </div>
+
+  <!-- OPTICS & BOKEH TUNING -->
+  <div class="card">
+    <div class="ctitle"><span>🌫️ DSLR ব্লার ও লেন্স টিউনিং</span><span>OPTICS</span></div>
+    <div class="srow">
+      <div><span>Optical Bokeh Blur (ব্যাকগ্রাউন্ড ব্লার):</span><span id="blurLbl" style="color:var(--green)">8px</span></div>
+      <input type="range" id="blurVal" min="2" max="16" value="8" oninput="document.getElementById('blurLbl').innerText=this.value+'px'">
+    </div>
+    <div class="srow">
+      <div><span>Vignette (ফ্রেম ছায়া):</span><span id="vigLbl" style="color:var(--gold)">15%</span></div>
+      <input type="range" id="vig" min="0" max="85" value="15" oninput="document.getElementById('vigLbl').innerText=this.value+'%'">
+    </div>
+    <div class="srow">
+      <div><span>Contrast (কনট্রাস্ট) & Brightness (আলো):</span><span id="ceLbl" style="color:var(--gold)">105% / 100%</span></div>
+      <div style="display:flex;gap:8px">
+        <input type="range" id="con" min="80" max="155" value="105" oninput="updateCELbl()">
+        <input type="range" id="exp" min="60" max="145" value="100" oninput="updateCELbl()">
+      </div>
+    </div>
+  </div>
 </div>
 
 <video id="vid" autoplay playsinline muted style="display:none"></video>
@@ -182,7 +175,6 @@ let stream=null,track=null,facing='environment',torchOn=false,camActive=false,sw
 let activeLUT='raw',cineBars=false,mirrorCam=false,blurMode=false;
 let recorder=null,chunks=[],isRec=false,recStart=0,frameCount=0,lastVideoBlob=null,lastVideoName='';
 
-// Resolutions & FPS Options
 const resOptions=[
   {label:'720p HD',long:1280,short:720,bps:4500000},
   {label:'1080p FHD',long:1920,short:1080,bps:8000000},
@@ -192,7 +184,7 @@ const resOptions=[
 let resIdx=1;
 
 const fpsOptions=[24,30,60];
-let fpsIdx=1;
+let fpsIdx=2; // Default 60 FPS for ultra-low latency
 
 const ratios=[
   {name:'16:9',label:'16:9 টিভি',css:'16/9'},
@@ -202,22 +194,22 @@ const ratios=[
 ];
 let rIdx=0;
 
-const vid=document.getElementById('vid'),cvs=document.getElementById('cineCvs'),ctx=cvs.getContext('2d',{willReadFrequently:true});
-// Processing canvas for fast pixel filters while exporting full 4K canvas
-const fxCvs=document.createElement('canvas'),fxCtx=fxCvs.getContext('2d',{willReadFrequently:true});
+const vid=document.getElementById('vid');
+// Desynchronized context removes browser display pipeline latency
+const cvs=document.getElementById('cineCvs'),ctx=cvs.getContext('2d',{desynchronized:true,alpha:false});
+
+// Lightweight buffer ONLY for heavy pixel VFX & AI segmentation
+const vfxCvs=document.createElement('canvas'),vfxCtx=vfxCvs.getContext('2d',{willReadFrequently:true});
 const bgCvs=document.createElement('canvas'),bgCtx=bgCvs.getContext('2d');
 const maskCvs=document.createElement('canvas'),maskCtx=maskCvs.getContext('2d');
 const fgCvs=document.createElement('canvas'),fgCtx=fgCvs.getContext('2d');
-let segBusy=false,segReady=false,selfieSeg=null;
-
-// Audio DSP Variables
-let actx=null,audioDest=null,micSrc=null,voiceFX='normal',monitorOn=false,activeNodes=[];
+let segBusy=false,segReady=false,selfieSeg=null,segFrameSkip=0;
 
 if(typeof SelfieSegmentation!=='undefined'){
   selfieSeg=new SelfieSegmentation({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${f}`});
   selfieSeg.setOptions({modelSelection:1,selfieMode:false});
   selfieSeg.onResults(res=>{
-    maskCvs.width=480;maskCvs.height=270;
+    maskCvs.width=320;maskCvs.height=180;
     maskCtx.clearRect(0,0,maskCvs.width,maskCvs.height);
     maskCtx.drawImage(res.segmentationMask,0,0,maskCvs.width,maskCvs.height);
     segReady=true;segBusy=false;
@@ -279,7 +271,6 @@ function switchTab(tab){
 }
 
 function updateCELbl(){document.getElementById('ceLbl').innerText=document.getElementById('con').value+'% / '+document.getElementById('exp').value+'%';}
-function updateGVLbl(){document.getElementById('gvLbl').innerText=document.getElementById('grain').value+'% / '+document.getElementById('vig').value+'%';}
 
 function setLUT(id,label){
   activeLUT=id;
@@ -320,7 +311,6 @@ function buildAudioGraph(){
 
   micSrc=actx.createMediaStreamSource(stream);
   activeNodes.push(micSrc);
-
   let tail=micSrc;
 
   if(voiceFX==='radio'){
@@ -383,7 +373,7 @@ async function openCamera(){
   const fps=fpsOptions[fpsIdx];
   try{
     stream=await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:facing,width:{ideal:res.long},height:{ideal:res.short},frameRate:{ideal:fps}},
+      video:{facingMode:facing,width:{ideal:res.long},height:{ideal:res.short},frameRate:{ideal:fps,min:24}},
       audio:{echoCancellation:true,noiseSuppression:true}
     });
   }catch(e){
@@ -401,7 +391,7 @@ async function openCamera(){
 
 async function restartCameraSmooth(){
   if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
-  await new Promise(r=>setTimeout(r,300));
+  await new Promise(r=>setTimeout(r,250));
   await openCamera();
 }
 
@@ -457,146 +447,152 @@ function drawSourceCover(targetCtx,src,W,H,mirror){
   targetCtx.restore();
 }
 
+// Hardware GPU CSS Filter string builder (Zero CPU Overhead)
+function getGPUFilterString(){
+  const exp=document.getElementById('exp').value;
+  const con=document.getElementById('con').value;
+  let base=`brightness(${exp}%) contrast(${con}%)`;
+
+  if(activeLUT==='teal')return base+' saturate(135%) hue-rotate(-8deg)';
+  if(activeLUT==='blockbuster')return base+' saturate(145%) contrast(118%)';
+  if(activeLUT==='noir')return base+' grayscale(100%) contrast(145%) brightness(92%)';
+  if(activeLUT==='bw')return base+' grayscale(100%)';
+  if(activeLUT==='sepia')return base+' sepia(85%) contrast(110%)';
+  if(activeLUT==='vivid')return base+' saturate(165%) contrast(112%)';
+  if(activeLUT==='vintage')return base+' sepia(45%) saturate(120%) contrast(95%) brightness(105%)';
+  if(activeLUT==='golden')return base+' sepia(35%) saturate(150%) hue-rotate(-10deg) brightness(106%)';
+  if(activeLUT==='dreamy')return base+' saturate(115%) brightness(110%) contrast(90%)';
+  if(activeLUT==='cyber')return base+' saturate(160%) hue-rotate(25deg) contrast(120%)';
+  if(activeLUT==='arctic')return base+' saturate(85%) hue-rotate(15deg) brightness(105%)';
+  if(activeLUT==='nv')return base+' grayscale(100%) sepia(100%) hue-rotate(75deg) saturate(350%) brightness(115%)';
+  return base;
+}
+
+const cpuPixelModes=['thermal','sketch','neonedge','vhs','comic','xray'];
+
 function renderCinema(){
   if(!camActive)return;
   const W=cvs.width,H=cvs.height;
 
   if(stream&&vid.readyState>=2){
-    // Run AI Mask at lightweight resolution
+    const isCPUMode=cpuPixelModes.includes(activeLUT);
+
+    // Run AI Mask every 2nd frame for zero lag
     if(blurMode&&selfieSeg&&!segBusy){
-      segBusy=true;
-      selfieSeg.send({image:vid}).catch(()=>{segBusy=false;});
+      segFrameSkip=(segFrameSkip+1)%2;
+      if(segFrameSkip===0){
+        segBusy=true;
+        selfieSeg.send({image:vid}).catch(()=>{segBusy=false;});
+      }
     }
 
-    // Use balanced internal processing resolution for smooth 4K output without lag
-    const pScale=W>1280?0.5:1;
-    const pW=Math.round(W*pScale),pH=Math.round(H*pScale);
-    fxCvs.width=pW;fxCvs.height=pH;
+    if(isCPUMode){
+      // Fast 480px internal buffer for pixel-level VFX
+      const pW=480,pH=Math.round(480*(H/W));
+      vfxCvs.width=pW;vfxCvs.height=pH;
+      drawSourceCover(vfxCtx,vid,pW,pH,mirrorCam);
+      const img=vfxCtx.getImageData(0,0,pW,pH),d=img.data;
 
-    if(blurMode&&segReady){
-      const blurPx=parseInt(document.getElementById('blurVal').value)*pScale;
-      const featherPx=parseInt(document.getElementById('featherVal').value);
-
-      // 1. Soft Optical Background Blur
-      bgCvs.width=pW;bgCvs.height=pH;
-      bgCtx.save();
-      bgCtx.filter=`blur(${blurPx}px)`;
-      drawSourceCover(bgCtx,vid,pW,pH,mirrorCam);
-      bgCtx.restore();
-      fxCtx.drawImage(bgCvs,0,0,pW,pH);
-
-      // 2. Feathered Foreground Subject (Eliminates harsh artificial cutout edges)
-      fgCvs.width=pW;fgCvs.height=pH;
-      fgCtx.save();
-      fgCtx.clearRect(0,0,pW,pH);
-      fgCtx.filter=`blur(${featherPx}px)`;
-      fgCtx.drawImage(maskCvs,0,0,pW,pH);
-      fgCtx.filter='none';
-      fgCtx.globalCompositeOperation='source-in';
-      drawSourceCover(fgCtx,vid,pW,pH,mirrorCam);
-      fgCtx.restore();
-
-      fxCtx.drawImage(fgCvs,0,0,pW,pH);
+      if(activeLUT==='sketch'||activeLUT==='neonedge'){
+        const copy=new Uint8ClampedArray(d);
+        const isNeon=activeLUT==='neonedge';
+        for(let y=1;y<pH-1;y++){
+          for(let x=1;x<pW-1;x++){
+            const i=(y*pW+x)*4;
+            const rgt=(y*pW+(x+1))*4,btm=((y+1)*pW+x)*4;
+            const l1=0.3*copy[i]+0.59*copy[i+1]+0.11*copy[i+2];
+            const l2=0.3*copy[rgt]+0.59*copy[rgt+1]+0.11*copy[rgt+2];
+            const l3=0.3*copy[btm]+0.59*copy[btm+1]+0.11*copy[btm+2];
+            const edge=Math.min(255,(Math.abs(l1-l2)+Math.abs(l1-l3))*3.2);
+            if(isNeon){d[i]=edge>45?edge*0.2:4;d[i+1]=edge>45?edge:8;d[i+2]=edge>45?255:18;}
+            else{const inv=255-edge;d[i]=inv;d[i+1]=inv;d[i+2]=inv;}
+          }
+        }
+      }else if(activeLUT==='vhs'){
+        const copy=new Uint8ClampedArray(d);
+        const shift=4;
+        for(let y=0;y<pH;y++){
+          const jit=(y%28===0)?Math.floor((Math.random()-0.5)*10):0;
+          for(let x=0;x<pW;x++){
+            const i=(y*pW+x)*4;
+            const rx=Math.min(pW-1,Math.max(0,x+shift+jit));
+            const bx=Math.min(pW-1,Math.max(0,x-shift+jit));
+            d[i]=copy[(y*pW+rx)*4]*1.1;
+            d[i+1]=copy[(y*pW+Math.max(0,Math.min(pW-1,x+jit)))*4+1];
+            d[i+2]=copy[(y*pW+bx)*4+2]*1.15;
+            if(y%3===0){d[i]*=0.82;d[i+1]*=0.82;d[i+2]*=0.82;}
+          }
+        }
+      }else{
+        for(let i=0;i<d.length;i+=4){
+          const r=d[i],g=d[i+1],b=d[i+2];
+          const lum=0.299*r+0.587*g+0.114*b;
+          if(activeLUT==='thermal'){
+            const t=clamp(lum)/255;
+            if(t<0.25){d[i]=0;d[i+1]=0;d[i+2]=t*4*255;}
+            else if(t<0.5){d[i]=0;d[i+1]=(t-0.25)*4*255;d[i+2]=255-(t-0.25)*4*255;}
+            else if(t<0.75){d[i]=(t-0.5)*4*255;d[i+1]=255;d[i+2]=0;}
+            else{d[i]=255;d[i+1]=255-(t-0.75)*4*180;d[i+2]=(t-0.75)*4*255;}
+          }else if(activeLUT==='comic'){
+            d[i]=Math.round(r/64)*64;d[i+1]=Math.round(g/64)*64;d[i+2]=Math.round(b/64)*64;
+          }else if(activeLUT==='xray'){
+            const inv=255-lum;d[i]=inv*0.6;d[i+1]=inv*0.95;d[i+2]=inv*1.25;
+          }
+        }
+      }
+      vfxCtx.putImageData(img,0,0);
+      ctx.drawImage(vfxCvs,0,0,W,H);
     }else{
-      drawSourceCover(fxCtx,vid,pW,pH,mirrorCam);
+      // ZERO-LATENCY GPU HARDWARE PATH
+      const gpuFilter=getGPUFilterString();
+
+      if(blurMode&&segReady){
+        const blurPx=document.getElementById('blurVal').value;
+        // Draw blurred background at half-res for speed
+        bgCvs.width=Math.round(W*0.4);bgCvs.height=Math.round(H*0.4);
+        bgCtx.save();
+        bgCtx.filter=`${gpuFilter} blur(${Math.max(2,Math.round(blurPx*0.5))}px)`;
+        drawSourceCover(bgCtx,vid,bgCvs.width,bgCvs.height,mirrorCam);
+        bgCtx.restore();
+        ctx.drawImage(bgCvs,0,0,W,H);
+
+        // Draw sharp subject with feathered mask
+        fgCvs.width=Math.round(W*0.6);fgCvs.height=Math.round(H*0.6);
+        fgCtx.save();
+        fgCtx.clearRect(0,0,fgCvs.width,fgCvs.height);
+        fgCtx.filter='blur(4px)';
+        fgCtx.drawImage(maskCvs,0,0,fgCvs.width,fgCvs.height);
+        fgCtx.filter=gpuFilter;
+        fgCtx.globalCompositeOperation='source-in';
+        drawSourceCover(fgCtx,vid,fgCvs.width,fgCvs.height,mirrorCam);
+        fgCtx.restore();
+        ctx.drawImage(fgCvs,0,0,W,H);
+      }else{
+        ctx.save();
+        ctx.filter=gpuFilter;
+        drawSourceCover(ctx,vid,W,H,mirrorCam);
+        ctx.restore();
+      }
+
+      // Color tint overlays for specific LUTs
+      if(activeLUT==='teal'){
+        ctx.save();ctx.globalCompositeOperation='overlay';
+        ctx.fillStyle='rgba(0, 145, 175, 0.22)';ctx.fillRect(0,0,W,H);
+        ctx.restore();
+      }else if(activeLUT==='arctic'){
+        ctx.save();ctx.globalCompositeOperation='screen';
+        ctx.fillStyle='rgba(15, 75, 140, 0.20)';ctx.fillRect(0,0,W,H);
+        ctx.restore();
+      }else if(activeLUT==='nv'){
+        ctx.fillStyle='rgba(0,255,80,0.08)';
+        for(let y=0;y<H;y+=6)ctx.fillRect(0,y,W,2);
+      }
     }
 
     if(activeLUT==='mirror'){
-      fxCtx.save();fxCtx.translate(pW,0);fxCtx.scale(-1,1);
-      fxCtx.drawImage(fxCvs,0,0,pW/2,pH,0,0,pW/2,pH);
-      fxCtx.restore();
-    }
-
-    // Apply Color LUTs & VFX
-    const img=fxCtx.getImageData(0,0,pW,pH),d=img.data;
-    const exp=parseInt(document.getElementById('exp').value)/100;
-    const con=parseInt(document.getElementById('con').value)/100;
-    const grainAmt=parseInt(document.getElementById('grain').value)*0.85;
-
-    if(activeLUT==='sketch'||activeLUT==='neonedge'){
-      const copy=new Uint8ClampedArray(d);
-      const isNeon=activeLUT==='neonedge';
-      for(let y=1;y<pH-1;y++){
-        for(let x=1;x<pW-1;x++){
-          const i=(y*pW+x)*4;
-          const rgt=(y*pW+(x+1))*4,btm=((y+1)*pW+x)*4;
-          const l1=0.3*copy[i]+0.59*copy[i+1]+0.11*copy[i+2];
-          const l2=0.3*copy[rgt]+0.59*copy[rgt+1]+0.11*copy[rgt+2];
-          const l3=0.3*copy[btm]+0.59*copy[btm+1]+0.11*copy[btm+2];
-          const edge=Math.min(255,(Math.abs(l1-l2)+Math.abs(l1-l3))*3.2);
-          if(isNeon){d[i]=edge>45?edge*0.2:4;d[i+1]=edge>45?edge:8;d[i+2]=edge>45?255:18;}
-          else{const inv=255-edge;d[i]=inv;d[i+1]=inv;d[i+2]=inv;}
-        }
-      }
-    }else if(activeLUT==='vhs'){
-      const copy=new Uint8ClampedArray(d);
-      const shift=Math.max(3,Math.round(pW*0.008));
-      for(let y=0;y<pH;y++){
-        const jit=(y%28===0)?Math.floor((Math.random()-0.5)*12):0;
-        for(let x=0;x<pW;x++){
-          const i=(y*pW+x)*4;
-          const rx=Math.min(pW-1,Math.max(0,x+shift+jit));
-          const bx=Math.min(pW-1,Math.max(0,x-shift+jit));
-          d[i]=copy[(y*pW+rx)*4]*1.1;
-          d[i+1]=copy[(y*pW+Math.max(0,Math.min(pW-1,x+jit)))*4+1];
-          d[i+2]=copy[(y*pW+bx)*4+2]*1.15;
-          if(y%3===0){d[i]*=0.82;d[i+1]*=0.82;d[i+2]*=0.82;}
-        }
-      }
-    }else{
-      for(let i=0;i<d.length;i+=4){
-        let r=d[i]*exp,g=d[i+1]*exp,b=d[i+2]*exp;
-        r=(r-128)*con+128;g=(g-128)*con+128;b=(b-128)*con+128;
-        const lum=0.299*r+0.587*g+0.114*b;
-
-        if(activeLUT==='teal'){
-          const w=lum/255;r=r*(1+0.18*w)-12*(1-w);g=g*(1+0.03*w)+6*(1-w);b=b*(1-0.22*w)+24*(1-w);
-        }else if(activeLUT==='blockbuster'){
-          r=r*1.16+8;g=g*1.04;b=b*0.88+6;
-        }else if(activeLUT==='noir'){
-          const bw=(lum-128)*1.38+128;r=bw;g=bw;b=bw*1.04;
-        }else if(activeLUT==='bw'){
-          r=lum;g=lum;b=lum;
-        }else if(activeLUT==='sepia'){
-          r=lum*1.15+22;g=lum*0.95+10;b=lum*0.72;
-        }else if(activeLUT==='vivid'){
-          r=lum+(r-lum)*1.42;g=lum+(g-lum)*1.42;b=lum+(b-lum)*1.42;
-        }else if(activeLUT==='vintage'){
-          r=r*1.12+14;g=g*1.03+8;b=b*0.82+10;
-        }else if(activeLUT==='golden'){
-          r=r*1.20+16;g=g*1.07+6;b=b*0.74;
-        }else if(activeLUT==='dreamy'){
-          r=r*0.95+22;g=g*0.92+18;b=b*1.02+24;
-        }else if(activeLUT==='cyber'){
-          r=r*1.15+12;g=g*0.82;b=b*1.25+22;
-        }else if(activeLUT==='arctic'){
-          r=r*0.82;g=g*1.02+6;b=b*1.24+16;
-        }else if(activeLUT==='nv'){
-          const nv=lum*1.35+(Math.random()-0.5)*22;r=nv*0.15;g=nv;b=nv*0.2;
-        }else if(activeLUT==='thermal'){
-          const t=clamp(lum)/255;
-          if(t<0.25){r=0;g=0;b=t*4*255;}
-          else if(t<0.5){r=0;g=(t-0.25)*4*255;b=255-(t-0.25)*4*255;}
-          else if(t<0.75){r=(t-0.5)*4*255;g=255;b=0;}
-          else{r=255;g=255-(t-0.75)*4*180;b=(t-0.75)*4*255;}
-        }else if(activeLUT==='comic'){
-          r=Math.round(r/64)*64;g=Math.round(g/64)*64;b=Math.round(b/64)*64;
-        }else if(activeLUT==='xray'){
-          const inv=255-lum;r=inv*0.6;g=inv*0.95;b=inv*1.25;
-        }
-
-        if(grainAmt>0){const n=(Math.random()-0.5)*grainAmt;r+=n;g+=n;b+=n;}
-        d[i]=clamp(r);d[i+1]=clamp(g);d[i+2]=clamp(b);
-      }
-    }
-    fxCtx.putImageData(img,0,0);
-
-    // Draw full resolution output canvas
-    ctx.drawImage(fxCvs,0,0,W,H);
-
-    if(activeLUT==='nv'){
-      ctx.fillStyle='rgba(0,255,80,0.08)';
-      for(let y=0;y<H;y+=6)ctx.fillRect(0,y,W,2);
+      ctx.save();ctx.translate(W,0);ctx.scale(-1,1);
+      ctx.drawImage(cvs,0,0,W/2,H,0,0,W/2,H);
+      ctx.restore();
     }
 
     const vigAmt=parseInt(document.getElementById('vig').value)/100;
@@ -649,7 +645,6 @@ function toggleRecord(){
   const bps=resOptions[resIdx].bps;
   const cStream=cvs.captureStream(fps);
 
-  // Attach Voice FX processed audio track
   if(audioDest&&audioDest.stream.getAudioTracks().length>0){
     audioDest.stream.getAudioTracks().forEach(t=>cStream.addTrack(t));
   }else if(stream){
